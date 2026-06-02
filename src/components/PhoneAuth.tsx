@@ -69,11 +69,15 @@ const PhoneAuth: React.FC = () => {
 
       const data = await response.json();
       
+      // Save role for ProtectedRoute checks
+      const role = data.user?.role || 'student';
+      localStorage.setItem('userRole', role);
+
       // Redirect based on role
       if (data.redirectTo) {
         navigate(data.redirectTo);
-      } else if (data.user?.role === 'admin') navigate('/admin-dashboard');
-      else if (data.user?.role === 'parent') navigate('/parent-dashboard');
+      } else if (role === 'admin') navigate('/admin-dashboard');
+      else if (role === 'parent') navigate('/parent-dashboard');
       else navigate('/student-dashboard');
       
     } catch (err: any) {

@@ -42,6 +42,7 @@ function MainDashboard({ role }: { role?: string }) {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('userRole');
       await signOut(auth);
       navigate('/login');
     } catch (error) {
@@ -4223,9 +4224,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<PhoneAuth />} />
-      <Route path="/student-dashboard" element={<ProtectedRoute><MainDashboard role="student" /></ProtectedRoute>} />
-      <Route path="/admin-dashboard" element={<ProtectedRoute><MainDashboard role="admin" /></ProtectedRoute>} />
-      <Route path="/parent-dashboard" element={<ProtectedRoute><MainDashboard role="parent" /></ProtectedRoute>} />
+      <Route path="/student-dashboard" element={<ProtectedRoute allowedRole="student"><MainDashboard role="student" /></ProtectedRoute>} />
+      <Route path="/admin-dashboard" element={<ProtectedRoute allowedRole="admin"><MainDashboard role="admin" /></ProtectedRoute>} />
+      <Route path="/parent-dashboard" element={<ProtectedRoute allowedRole="parent"><MainDashboard role="parent" /></ProtectedRoute>} />
     </Routes>
   );
 }
