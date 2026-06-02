@@ -1,0 +1,6 @@
+{
+  "name": "ABHIshiksha",
+  "description": "Premium AI-powered adaptive learning platform designed for Indian government school students in Classes 1–12.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

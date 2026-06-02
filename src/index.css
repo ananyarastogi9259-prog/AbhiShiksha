@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-primary-blue: #005BFF;
+  --color-royal-blue: #0038FF;
+  --color-accent-cyan: #27D8FF;
+  --color-bg-white: #F8FBFF;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-white);
+    color: #0c1a30;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-panel-dark {
+  background: rgba(10, 30, 80, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Pulsing voice recording */
+@keyframes waves {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+.animated-waves {
+  animation: waves 1.8s infinite ease-in-out;
+}
+
+/* Custom premium box shadow */
+.premium-shadow {
+  box-shadow: 0 10px 30px -10px rgba(0, 91, 255, 0.12), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.premium-shadow-lg {
+  box-shadow: 0 20px 40px -15px rgba(0, 56, 255, 0.18), 0 1px 5px rgba(0, 0, 0, 0.03);
+}
+
+/* Dyslexic Friendly typography toggle support */
+.font-dyslexic {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.18em !important;
+  line-height: 1.6 !important;
+}
