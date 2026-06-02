@@ -4,7 +4,10 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import { signOut } from 'firebase/auth';
+import { auth } from './firebase';
 import PhoneAuth from './components/PhoneAuth';
 import { 
   BookOpen, Sparkles, Brain, Video, User, Award, MessageSquare, Home, 
@@ -35,6 +38,17 @@ export const CLASSES_METADATA = [
 ];
 
 function MainDashboard({ role }: { role?: string }) {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/login');
+    } catch (error) {
+      console.error("Logout error", error);
+    }
+  };
+
   // Global States
   const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'login' | 'interests' | 'main'>('splash');
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'tiktok' | 'tutor' | 'hubs' | 'profile'>('dashboard');
@@ -860,6 +874,15 @@ function MainDashboard({ role }: { role?: string }) {
             title="Dyslexia Friendly Font Switcher"
           >
             ✏️ Dyslexic Assist
+          </button>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 shadow-xs cursor-pointer"
+            title="Logout"
+          >
+            🚪 Logout
           </button>
 
         </div>
@@ -4200,9 +4223,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<PhoneAuth />} />
-      <Route path="/student-dashboard" element={<MainDashboard role="student" />} />
-      <Route path="/admin-dashboard" element={<MainDashboard role="admin" />} />
-      <Route path="/parent-dashboard" element={<MainDashboard role="parent" />} />
+      <Route path="/student-dashboard" element={<ProtectedRoute><MainDashboard role="student" /></ProtectedRoute>} />
+      <Route path="/admin-dashboard" element={<ProtectedRoute><MainDashboard role="admin" /></ProtectedRoute>} />
+      <Route path="/parent-dashboard" element={<ProtectedRoute><MainDashboard role="parent" /></ProtectedRoute>} />
     </Routes>
   );
 }
