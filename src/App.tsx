@@ -10,6 +10,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import PhoneAuth from './components/PhoneAuth';
 import ParentDashboard from './components/ParentDashboard';
+import AdminDashboard from './components/AdminDashboard';
 import { 
   BookOpen, Sparkles, Brain, Video, User, Award, MessageSquare, Home, 
   Flame, Trophy, Sliders, DownloadCloud, Wifi, WifiOff, HardDrive, 
@@ -1223,6 +1224,8 @@ function MainDashboard({ role }: { role?: string }) {
 
             </div>
           </div>
+        ) : role === 'admin' ? (
+          <AdminDashboard language={language} />
         ) : role === 'parent' ? (
           <ParentDashboard language={language} />
         ) : (
