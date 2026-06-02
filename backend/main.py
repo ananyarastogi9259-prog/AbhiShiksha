@@ -78,12 +78,26 @@ async def verify_token(req: TokenVerifyRequest):
         raise HTTPException(status_code=503, detail="Database not available")
         
     users_collection = db["users"]
+    expected_role = "student"
+    if phone_number == "+918888888888":
+        expected_role = "parent"
+    elif phone_number == "+917777777777":
+        expected_role = "admin"
+
     user = await users_collection.find_one({"firebaseUid": firebase_uid})
     
     if user:
         print(f"[AUTH] Found existing user in MongoDB: {user.get('_id')}")
-        role = user.get("role", "student")
-        redirect_to = f"/{role}-dashboard"
+        current_role = user.get("role", "student")
+        
+        # Force update role if it's one of our test numbers and doesn't match expected
+        if current_role != expected_role and phone_number in ["+918888888888", "+917777777777"]:
+            print(f"[AUTH] Updating existing user {phone_number} role to {expected_role}")
+            await users_collection.update_one({"_id": user["_id"]}, {"$set": {"role": expected_role}})
+            current_role = expected_role
+            user["role"] = expected_role
+
+        redirect_to = f"/{current_role}-dashboard"
         user_dict = {**user, "_id": str(user["_id"])}
         return {"success": True, "user": user_dict, "redirectTo": redirect_to}
         
@@ -92,10 +106,10 @@ async def verify_token(req: TokenVerifyRequest):
     new_user = {
         "firebaseUid": firebase_uid,
         "phoneNumber": phone_number,
-        "role": "student",
+        "role": expected_role,
         "createdAt": datetime.now(timezone.utc).isoformat()
     }
     result = await users_collection.insert_one(new_user)
     print(f"[AUTH] New user created successfully with ID: {result.inserted_id}")
     new_user["_id"] = str(result.inserted_id)
-    return {"success": True, "user": new_user, "redirectTo": "/student-dashboard"}
+    return {"success": True, "user": new_user, "redirectTo": f"/{expected_role}-dashboard"}

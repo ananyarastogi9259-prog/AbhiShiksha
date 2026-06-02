@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import PhoneAuth from './components/PhoneAuth';
+import ParentDashboard from './components/ParentDashboard';
 import { 
   BookOpen, Sparkles, Brain, Video, User, Award, MessageSquare, Home, 
   Flame, Trophy, Sliders, DownloadCloud, Wifi, WifiOff, HardDrive, 
@@ -1222,6 +1223,8 @@ function MainDashboard({ role }: { role?: string }) {
 
             </div>
           </div>
+        ) : role === 'parent' ? (
+          <ParentDashboard language={language} />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
             
