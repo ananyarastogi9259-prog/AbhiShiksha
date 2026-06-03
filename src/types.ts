@@ -123,3 +123,14 @@ export interface Scholarship {
   eligibilityEn: string;
   eligibilityHi: string;
 }
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  class_grade: string;
+  thumbnail: string;
+  status: string;
+  created_at?: string;
+}
