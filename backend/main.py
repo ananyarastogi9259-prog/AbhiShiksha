@@ -212,3 +212,84 @@ async def delete_course(course_id: str):
         raise HTTPException(status_code=404, detail="Course not found")
         
     return {"message": "Course deleted successfully"}
+
+# --- Curriculum Management APIs ---
+
+class ChapterBase(BaseModel):
+    class_grade: str
+    subject: str
+    chapter_number: int
+    chapter_name: str
+    videoUrl: str = ""
+    notesPdfUrl: str = ""
+    quiz_available: bool = False
+    book_name: str = ""
+    animatedVideoUrl: str = ""
+    interactiveActivityUrl: str = ""
+
+class ChapterCreate(ChapterBase):
+    pass
+
+class ChapterUpdate(BaseModel):
+    videoUrl: Optional[str] = None
+    notesPdfUrl: Optional[str] = None
+    quiz_available: Optional[bool] = None
+    animatedVideoUrl: Optional[str] = None
+    interactiveActivityUrl: Optional[str] = None
+
+class ChapterResponse(ChapterBase):
+    id: str
+
+@app.get("/api/curriculum/{class_grade}/{subject}", response_model=List[ChapterResponse])
+async def get_curriculum(class_grade: str, subject: str):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    cursor = db["curriculum"].find({"class_grade": class_grade, "subject": subject}).sort("chapter_number", 1)
+    chapters = await cursor.to_list(length=100)
+    
+    for chapter in chapters:
+        chapter["id"] = str(chapter.pop("_id"))
+        
+    return chapters
+
+@app.post("/api/curriculum/bulk")
+async def bulk_create_curriculum(chapters: List[ChapterCreate]):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+        
+    if not chapters:
+        return {"inserted_count": 0}
+        
+    chapters_dict = [chap.model_dump() for chap in chapters]
+    result = await db["curriculum"].insert_many(chapters_dict)
+    return {"inserted_count": len(result.inserted_ids)}
+
+@app.put("/api/curriculum/{chapter_id}", response_model=ChapterResponse)
+async def update_chapter(chapter_id: str, chapter_update: ChapterUpdate):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+        
+    try:
+        obj_id = ObjectId(chapter_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid chapter ID format")
+
+    update_data = {k: v for k, v in chapter_update.model_dump().items() if v is not None}
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update provided")
+
+    result = await db["curriculum"].update_one({"_id": obj_id}, {"$set": update_data})
+    
+    if result.modified_count == 0:
+        existing = await db["curriculum"].find_one({"_id": obj_id})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Chapter not found")
+            
+    updated_chapter = await db["curriculum"].find_one({"_id": obj_id})
+    updated_chapter["id"] = str(updated_chapter.pop("_id"))
+    return updated_chapter

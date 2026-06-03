@@ -134,3 +134,17 @@ export interface Course {
   status: string;
   created_at?: string;
 }
+
+export interface CurriculumChapter {
+  id: string;
+  class_grade: string;
+  subject: string;
+  chapter_number: number;
+  chapter_name: string;
+  videoUrl: string;
+  notesPdfUrl: string;
+  quiz_available: boolean;
+  book_name?: string;
+  animatedVideoUrl?: string;
+  interactiveActivityUrl?: string;
+}

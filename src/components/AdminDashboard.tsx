@@ -1,16 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, BookOpen, UserCheck, ShieldAlert, Settings,
-  Clock, Plus, Filter, TrendingUp, Video, FileText, Zap, Megaphone, ArrowLeft, Trash2, Edit2
+  Clock, Plus, Filter, TrendingUp, Video, FileText, Zap, Megaphone, ArrowLeft, Trash2, Edit2, Check, X
 } from 'lucide-react';
-import type { Course } from '../types';
+import type { Course, CurriculumChapter } from '../types';
 
 interface AdminDashboardProps {
   language?: 'en' | 'hi';
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'content-menu' | 'add-motivation' | 'add-course' | 'manage-courses'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'content-menu' | 'add-motivation' | 'add-course' | 'manage-courses' | 'curriculum-management'>('overview');
+  
+  // Curriculum State
+  const [curriculumClass, setCurriculumClass] = useState('10');
+  const [curriculumSubject, setCurriculumSubject] = useState('Science');
+  const [chapters, setChapters] = useState<CurriculumChapter[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+  
+  // Curriculum Edit State
+  const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
+  const [editVideoUrl, setEditVideoUrl] = useState('');
+  const [editPdfUrl, setEditPdfUrl] = useState('');
+  const [editQuiz, setEditQuiz] = useState(false);
+  const [editAnimatedVideoUrl, setEditAnimatedVideoUrl] = useState('');
+  const [editInteractiveActivityUrl, setEditInteractiveActivityUrl] = useState('');
+
+  const fetchCurriculum = async () => {
+    setLoadingChapters(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/curriculum/${curriculumClass}/${curriculumSubject}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChapters(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingChapters(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'curriculum-management') {
+      fetchCurriculum();
+    }
+  }, [activeTab, curriculumClass, curriculumSubject]);
+
+  const handleUpdateChapter = async (id: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/curriculum/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoUrl: editVideoUrl,
+          notesPdfUrl: editPdfUrl,
+          quiz_available: editQuiz,
+          animatedVideoUrl: editAnimatedVideoUrl,
+          interactiveActivityUrl: editInteractiveActivityUrl
+        })
+      });
+      if (res.ok) {
+        setEditingChapterId(null);
+        fetchCurriculum();
+      } else {
+        alert('Failed to update chapter');
+      }
+    } catch(err) {
+      console.error(err);
+    }
+  };
+
+  const startEditingChapter = (chap: CurriculumChapter) => {
+    setEditingChapterId(chap.id);
+    setEditVideoUrl(chap.videoUrl);
+    setEditPdfUrl(chap.notesPdfUrl);
+    setEditQuiz(chap.quiz_available);
+    setEditAnimatedVideoUrl(chap.animatedVideoUrl || '');
+    setEditInteractiveActivityUrl(chap.interactiveActivityUrl || '');
+  };
+
   
   // Course State
   const [courses, setCourses] = useState<Course[]>([]);
@@ -259,12 +328,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
           <p className="text-xs text-slate-500 mt-2">Create a new subject curriculum.</p>
         </button>
 
-        <button className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-purple-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer">
+        <button 
+          onClick={() => setActiveTab('curriculum-management')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-purple-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer">
           <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 mb-4 group-hover:scale-110 transition-transform">
             <Video className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-bold text-slate-800">Add Video Chapter</h3>
-          <p className="text-xs text-slate-500 mt-2">Upload a new video lesson to an existing course.</p>
+          <h3 className="text-lg font-bold text-slate-800">Manage Curriculum</h3>
+          <p className="text-xs text-slate-500 mt-2">Manage NCERT chapters and resources.</p>
         </button>
 
         <button className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer">
@@ -606,6 +677,143 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
     </>
   );
 
+  const renderCurriculumManagement = () => (
+    <>
+      <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setActiveTab('content-menu')}
+            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer shadow-sm"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-black text-purple-600 flex items-center gap-2">
+              <Video className="w-6 h-6" /> NCERT Curriculum
+            </h2>
+            <p className="text-sm text-slate-600 mt-1">Manage chapters and resources for official curriculum.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row gap-4 mb-6 pb-6 border-b border-slate-100">
+          <div className="flex-1 space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Class</label>
+            <select 
+              value={curriculumClass}
+              onChange={(e) => setCurriculumClass(e.target.value)}
+              className="w-full bg-[#F8FBFF] border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 cursor-pointer"
+            >
+              <option value="1">Class 1</option>
+              <option value="2">Class 2</option>
+              <option value="3">Class 3</option>
+              <option value="4">Class 4</option>
+              <option value="5">Class 5</option>
+              <option value="6">Class 6</option>
+              <option value="7">Class 7</option>
+              <option value="8">Class 8</option>
+              <option value="9">Class 9</option>
+              <option value="10">Class 10</option>
+              <option value="11">Class 11</option>
+              <option value="12">Class 12</option>
+            </select>
+          </div>
+          <div className="flex-1 space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Subject</label>
+            <select 
+              value={curriculumSubject}
+              onChange={(e) => setCurriculumSubject(e.target.value)}
+              className="w-full bg-[#F8FBFF] border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 cursor-pointer"
+            >
+              <option value="Mathematics">Mathematics</option>
+              <option value="English">English</option>
+              <option value="Hindi">Hindi</option>
+              <option value="EVS">EVS (Class 3-5)</option>
+              <option value="Science">Science (Class 6-10)</option>
+              <option value="Social Science">Social Science (Class 6-10)</option>
+              <option value="Physics">Physics (Class 11/12)</option>
+              <option value="Chemistry">Chemistry (Class 11/12)</option>
+              <option value="Biology">Biology (Class 11/12)</option>
+            </select>
+          </div>
+        </div>
+
+        {loadingChapters ? (
+           <p className="text-center font-bold text-slate-500 py-10">Loading Chapters...</p>
+        ) : chapters.length === 0 ? (
+           <p className="text-center font-bold text-slate-500 py-10">No chapters found for this selection.</p>
+        ) : (
+          <div className="space-y-4">
+            {chapters.map(chap => (
+              <div key={chap.id} className="border border-slate-200 rounded-2xl p-5 bg-slate-50">
+                <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
+                  <div>
+                    <span className="text-xs font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded">Chapter {chap.chapter_number}</span>
+                    <h4 className="text-lg font-black text-slate-800 mt-2">{chap.chapter_name}</h4>
+                  </div>
+                  {editingChapterId === chap.id ? (
+                     <div className="flex items-center gap-2">
+                        <button onClick={() => setEditingChapterId(null)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg text-sm cursor-pointer hover:bg-slate-300">Cancel</button>
+                        <button onClick={() => handleUpdateChapter(chap.id)} className="px-4 py-2 bg-purple-600 text-white font-bold rounded-lg text-sm cursor-pointer hover:bg-purple-700 shadow">Save</button>
+                     </div>
+                  ) : (
+                     <button onClick={() => startEditingChapter(chap)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg shadow-sm text-sm hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
+                       <Edit2 className="w-4 h-4" /> Edit Resources
+                     </button>
+                  )}
+                </div>
+                
+                {editingChapterId === chap.id ? (
+                  <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500">Video URL</label>
+                      <input type="text" value={editVideoUrl} onChange={(e) => setEditVideoUrl(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-purple-500" placeholder="https://youtube.com/..."/>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500">Notes PDF URL</label>
+                      <input type="text" value={editPdfUrl} onChange={(e) => setEditPdfUrl(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-purple-500" placeholder="https://..."/>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-purple-500 flex items-center gap-1">Animated Video URL <span className="text-[10px] bg-purple-100 text-purple-600 px-1 rounded">Primary</span></label>
+                      <input type="text" value={editAnimatedVideoUrl} onChange={(e) => setEditAnimatedVideoUrl(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-purple-500" placeholder="Optional animation link..."/>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-purple-500 flex items-center gap-1">Interactive Activity URL <span className="text-[10px] bg-purple-100 text-purple-600 px-1 rounded">Primary</span></label>
+                      <input type="text" value={editInteractiveActivityUrl} onChange={(e) => setEditInteractiveActivityUrl(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-purple-500" placeholder="Optional activity link..."/>
+                    </div>
+                    <div className="space-y-2 md:col-span-2 flex items-center gap-2 mt-2">
+                      <input type="checkbox" checked={editQuiz} onChange={(e) => setEditQuiz(e.target.checked)} className="w-4 h-4 rounded text-purple-600 border-gray-300 cursor-pointer" id={`quiz-${chap.id}`}/>
+                      <label htmlFor={`quiz-${chap.id}`} className="text-sm font-bold text-slate-700 cursor-pointer">Quiz Available</label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {chap.videoUrl ? (
+                      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded flex items-center gap-1"><Check className="w-3 h-3"/> Video Attached</span>
+                    ) : (
+                      <span className="text-xs font-bold bg-slate-200 text-slate-500 px-2 py-1 rounded">No Video</span>
+                    )}
+                    {chap.notesPdfUrl ? (
+                      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded flex items-center gap-1"><Check className="w-3 h-3"/> Notes Attached</span>
+                    ) : (
+                      <span className="text-xs font-bold bg-slate-200 text-slate-500 px-2 py-1 rounded">No Notes</span>
+                    )}
+                    {chap.quiz_available ? (
+                      <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-1 rounded flex items-center gap-1"><Check className="w-3 h-3"/> Quiz Active</span>
+                    ) : (
+                      <span className="text-xs font-bold bg-slate-200 text-slate-500 px-2 py-1 rounded">No Quiz</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className="w-full">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -614,6 +822,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
         {activeTab === 'add-motivation' && renderAddMotivation()}
         {activeTab === 'manage-courses' && renderManageCourses()}
         {activeTab === 'add-course' && renderAddCourse()}
+        {activeTab === 'curriculum-management' && renderCurriculumManagement()}
       </div>
     </div>
   );
