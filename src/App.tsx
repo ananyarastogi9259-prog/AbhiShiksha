@@ -11,6 +11,7 @@ import { auth } from './firebase';
 import PhoneAuth from './components/PhoneAuth';
 import ParentDashboard from './components/ParentDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import StudentLearningView from './components/StudentLearningView';
 import { 
   BookOpen, Sparkles, Brain, Video, User, Award, MessageSquare, Home, 
   Flame, Trophy, Sliders, DownloadCloud, Wifi, WifiOff, HardDrive, 
@@ -54,7 +55,7 @@ function MainDashboard({ role }: { role?: string }) {
 
   // Global States
   const [currentScreen, setCurrentScreen] = useState<'splash' | 'onboarding' | 'login' | 'interests' | 'main'>('splash');
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'tiktok' | 'tutor' | 'hubs' | 'profile'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'tiktok' | 'tutor' | 'hubs' | 'profile' | 'real-learning'>('dashboard');
   const [language, setLanguage] = useState<Language>(() => {
     const savedLanguage = localStorage.getItem("language");
     return (savedLanguage === 'hi' || savedLanguage === 'en') ? (savedLanguage as Language) : 'en';
@@ -2759,6 +2760,15 @@ function MainDashboard({ role }: { role?: string }) {
                       </button>
 
                       <button 
+                        id="nav-real-learning"
+                        onClick={() => setCurrentTab('real-learning')} 
+                        className={`flex flex-col items-center gap-1 w-12 transition-all cursor-pointer ${currentTab === 'real-learning' ? 'text-[#0038FF] dark:text-[#27D8FF] scale-105 font-extrabold' : 'text-slate-450 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
+                      >
+                        <Play className="w-4 h-4" />
+                        <span className="text-[8px] font-bold">Portal</span>
+                      </button>
+
+                      <button 
                         id="nav-video"
                         onClick={() => setCurrentTab('tiktok')} 
                         className={`flex flex-col items-center gap-1 w-12 transition-all relative cursor-pointer ${currentTab === 'tiktok' ? 'text-[#0038FF] dark:text-[#27D8FF] scale-105 font-extrabold' : 'text-slate-450 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
@@ -2914,6 +2924,12 @@ function MainDashboard({ role }: { role?: string }) {
               <div className="space-y-6">
                 
                 {/* WIDGET DISPATCHER FOR ALL TABS (Widespread grid layouts) */}
+                {currentTab === 'real-learning' && (
+                  <div className="animate-fade-in text-left mb-10">
+                    <StudentLearningView language={language} theme={theme} />
+                  </div>
+                )}
+                
                 {currentTab === 'dashboard' && (
                   <div className="space-y-6 animate-fade-in text-left">
                     {/* Welcome Banner */}

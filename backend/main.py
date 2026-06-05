@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from firebase_setup import initialize_firebase, verify_firebase_token
 from typing import Optional, List
 from bson import ObjectId
+from youtubesearchpython import VideosSearch
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -293,3 +294,186 @@ async def update_chapter(chapter_id: str, chapter_update: ChapterUpdate):
     updated_chapter = await db["curriculum"].find_one({"_id": obj_id})
     updated_chapter["id"] = str(updated_chapter.pop("_id"))
     return updated_chapter
+
+# --- Video Management APIs ---
+
+class VideoBase(BaseModel):
+    chapter_id: str
+    videoTitle: str
+    videoUrl: str
+    teacherName: str = ""
+    language: str = "en"
+    duration: str = ""
+    videoType: str = "explanation"
+
+class VideoCreate(VideoBase):
+    pass
+
+class VideoResponse(VideoBase):
+    id: str
+
+@app.get("/api/videos/{chapter_id}", response_model=List[VideoResponse])
+async def get_videos(chapter_id: str):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    cursor = db["chapter_videos"].find({"chapter_id": chapter_id})
+    videos = await cursor.to_list(length=100)
+    
+    for video in videos:
+        video["id"] = str(video.pop("_id"))
+        
+    return videos
+
+@app.post("/api/videos", response_model=VideoResponse)
+async def create_video(video: VideoCreate):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+        
+    video_dict = video.model_dump()
+    result = await db["chapter_videos"].insert_one(video_dict)
+    
+    created_video = await db["chapter_videos"].find_one({"_id": result.inserted_id})
+    created_video["id"] = str(created_video.pop("_id"))
+    return created_video
+
+@app.delete("/api/videos/{video_id}")
+async def delete_video(video_id: str):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+        
+    try:
+        obj_id = ObjectId(video_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid video ID format")
+        
+    result = await db["chapter_videos"].delete_one({"_id": obj_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Video not found")
+        
+    return {"message": "Video deleted successfully"}
+
+@app.post("/api/videos/autofetch/{chapter_id}")
+async def autofetch_videos(chapter_id: str):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+        
+    try:
+        obj_id = ObjectId(chapter_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid chapter ID format")
+        
+    # 1. Fetch chapter
+    chapter = await db["curriculum"].find_one({"_id": obj_id})
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+        
+    c_class = chapter.get("class_grade", "")
+    c_sub = chapter.get("subject", "")
+    c_name = chapter.get("chapter_name", "")
+    
+    # 2. Query
+    query = f"NCERT Class {c_class} {c_sub} {c_name}"
+    
+    # 3. Search
+    try:
+        videos_search = VideosSearch(query, limit=15)
+        results = videos_search.result()
+        if not results or "result" not in results:
+            return {"inserted_count": 0, "videos": []}
+            
+        scraped_videos = results["result"]
+    except Exception as e:
+        print("Search error:", e)
+        return {"inserted_count": 0, "videos": []}
+        
+    trusted_channels = [
+        "physics wallah", "magnet brains", "khan academy india", 
+        "vedantu", "dear sir", "learnohub", "unacademy"
+    ]
+    
+    scored_videos = []
+    
+    for v in scraped_videos:
+        if v.get("type") != "video":
+            continue
+            
+        channel_name = v.get("channel", {}).get("name", "")
+        duration_str = v.get("duration", "0:00")
+        view_count_str = v.get("viewCount", {"text": "0 views"}).get("text", "0")
+        
+        # Convert views string to number
+        try:
+            views = int(''.join(filter(str.isdigit, view_count_str)))
+        except:
+            views = 0
+            
+        score = 0
+        
+        # Priority for trusted channels
+        channel_lower = channel_name.lower()
+        if any(trusted in channel_lower for trusted in trusted_channels):
+            score += 500
+            
+        # Score views
+        if views > 1000000:
+            score += 100
+        elif views > 100000:
+            score += 50
+        elif views > 10000:
+            score += 10
+            
+        # Duration preference (avoid shorts < 5m or massive streams > 2h)
+        try:
+            parts = duration_str.split(":")
+            if len(parts) == 2:
+                mins = int(parts[0])
+            elif len(parts) == 3:
+                mins = int(parts[0]) * 60 + int(parts[1])
+            else:
+                mins = 0
+                
+            if 5 <= mins <= 60:
+                score += 50 # Good length for explanation
+            elif mins < 5:
+                score -= 100 # Likely a short/clip
+            elif mins > 120:
+                score -= 50 # Too long
+        except:
+            pass
+            
+        scored_videos.append({
+            "score": score,
+            "videoTitle": v.get("title", ""),
+            "videoUrl": v.get("link", ""),
+            "teacherName": channel_name,
+            "duration": duration_str,
+            "language": "hi" if "hi" in v.get("title", "").lower() or "hindi" in v.get("title", "").lower() else "en",
+            "videoType": "explanation"
+        })
+        
+    # 4. Sort and pick top 3
+    scored_videos.sort(key=lambda x: x["score"], reverse=True)
+    top_videos = scored_videos[:3]
+    
+    inserted = []
+    for tv in top_videos:
+        video_doc = {
+            "chapter_id": chapter_id,
+            "videoTitle": tv["videoTitle"],
+            "videoUrl": tv["videoUrl"],
+            "teacherName": tv["teacherName"],
+            "language": tv["language"],
+            "duration": tv["duration"],
+            "videoType": tv["videoType"]
+        }
+        res = await db["chapter_videos"].insert_one(video_doc)
+        video_doc["id"] = str(res.inserted_id)
+        video_doc.pop("_id", None)
+        inserted.append(video_doc)
+        
+    return {"inserted_count": len(inserted), "videos": inserted}

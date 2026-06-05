@@ -148,3 +148,14 @@ export interface CurriculumChapter {
   animatedVideoUrl?: string;
   interactiveActivityUrl?: string;
 }
+
+export interface ChapterVideo {
+  id: string;
+  chapter_id: string;
+  videoTitle: string;
+  videoUrl: string;
+  teacherName: string;
+  language: string;
+  duration: string;
+  videoType: string;
+}

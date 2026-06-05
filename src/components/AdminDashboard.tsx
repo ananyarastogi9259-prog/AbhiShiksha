@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, BookOpen, UserCheck, ShieldAlert, Settings,
-  Clock, Plus, Filter, TrendingUp, Video, FileText, Zap, Megaphone, ArrowLeft, Trash2, Edit2, Check, X
+  Clock, Plus, Filter, TrendingUp, Video, FileText, Zap, Megaphone, ArrowLeft, Trash2, Edit2, Check, X, Play, Sparkles
 } from 'lucide-react';
-import type { Course, CurriculumChapter } from '../types';
+import type { Course, CurriculumChapter, ChapterVideo } from '../types';
 
 interface AdminDashboardProps {
   language?: 'en' | 'hi';
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'content-menu' | 'add-motivation' | 'add-course' | 'manage-courses' | 'curriculum-management'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'content-menu' | 'add-motivation' | 'add-course' | 'manage-courses' | 'curriculum-management' | 'user-management' | 'system-settings' | 'video-management' | 'announcements'>('overview');
   
   // Curriculum State
   const [curriculumClass, setCurriculumClass] = useState('10');
@@ -78,6 +78,98 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
     setEditQuiz(chap.quiz_available);
     setEditAnimatedVideoUrl(chap.animatedVideoUrl || '');
     setEditInteractiveActivityUrl(chap.interactiveActivityUrl || '');
+    fetchChapterVideos(chap.id);
+  };
+
+  // Video Management State
+  const [chapterVideos, setChapterVideos] = useState<ChapterVideo[]>([]);
+  const [newVideoTitle, setNewVideoTitle] = useState('');
+  const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newVideoTeacher, setNewVideoTeacher] = useState('');
+  const [newVideoLanguage, setNewVideoLanguage] = useState('en');
+  const [newVideoDuration, setNewVideoDuration] = useState('');
+  const [newVideoType, setNewVideoType] = useState('explanation');
+
+  const fetchChapterVideos = async (chapterId: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/videos/${chapterId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChapterVideos(data);
+      }
+    } catch (err) {
+      console.error('Error fetching videos', err);
+    }
+  };
+
+  const handleAddVideo = async () => {
+    if (!editingChapterId || !newVideoTitle || !newVideoUrl) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/videos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chapter_id: editingChapterId,
+          videoTitle: newVideoTitle,
+          videoUrl: newVideoUrl,
+          teacherName: newVideoTeacher,
+          language: newVideoLanguage,
+          duration: newVideoDuration,
+          videoType: newVideoType
+        })
+      });
+      if (res.ok) {
+        fetchChapterVideos(editingChapterId);
+        setNewVideoTitle('');
+        setNewVideoUrl('');
+        setNewVideoTeacher('');
+        setNewVideoDuration('');
+      } else {
+        alert('Failed to add video');
+      }
+    } catch (err) {
+      console.error('Error adding video', err);
+    }
+  };
+
+  const handleDeleteVideo = async (videoId: string) => {
+    if (!editingChapterId) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/videos/${videoId}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchChapterVideos(editingChapterId);
+      }
+    } catch (err) {
+      console.error('Error deleting video', err);
+    }
+  };
+
+  const [isAutoFetching, setIsAutoFetching] = useState(false);
+  const handleAutoFetchVideos = async () => {
+    if (!editingChapterId) {
+      alert('Please select a chapter first.');
+      return;
+    }
+    setIsAutoFetching(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/videos/autofetch/${editingChapterId}`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.inserted_count > 0) {
+          alert('Videos fetched successfully');
+          fetchChapterVideos(editingChapterId);
+        } else {
+          alert('Failed to fetch videos');
+        }
+      } else {
+        alert('Failed to fetch videos');
+      }
+    } catch (err) {
+      console.error('Error auto-fetching videos', err);
+      alert('Failed to fetch videos');
+    } finally {
+      setIsAutoFetching(false);
+    }
   };
 
   
@@ -161,11 +253,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
     }
   };
   
+  // User Management State
+  const [dummyUsers, setDummyUsers] = useState([
+    { id: 1, name: 'Rahul Sharma', email: 'rahul@example.com', role: 'student', joinDate: '2023-08-15', status: 'active' },
+    { id: 2, name: 'Priya Patel', email: 'priya@example.com', role: 'parent', joinDate: '2023-09-02', status: 'active' },
+    { id: 3, name: 'Amit Kumar', email: 'amit@example.com', role: 'student', joinDate: '2023-10-11', status: 'inactive' },
+    { id: 4, name: 'Neha Gupta', email: 'neha@example.com', role: 'admin', joinDate: '2023-01-05', status: 'active' },
+    { id: 5, name: 'Vikram Singh', email: 'vikram@example.com', role: 'student', joinDate: '2023-11-20', status: 'active' },
+  ]);
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
+
+  const filteredUsers = userRoleFilter === 'all' ? dummyUsers : dummyUsers.filter(u => u.role === userRoleFilter);
+
   // Dummy Data
   const metrics = {
     totalStudents: '1,420',
     totalParents: '845',
-    totalCourses: '42'
+    totalAdmins: '12',
+    totalCourses: '42',
+    totalChapters: '315',
+    totalVideos: '1,894'
   };
 
   const recentActivity = [
@@ -177,126 +284,136 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
 
   const renderOverview = () => (
     <>
-      {/* Page Title */}
-      <div className="mb-8 flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-black text-[#0038FF]">Administrator Portal</h2>
-          <p className="text-sm text-slate-600 mt-1">Platform overview and management.</p>
+      {/* Hero Header */}
+      <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full pointer-events-none opacity-60"></div>
+        <div className="relative z-10">
+          <h2 className="text-4xl font-black text-[#0038FF] flex items-center gap-3">
+             🛠️ Admin Dashboard
+          </h2>
+          <p className="text-slate-600 mt-2 font-medium">Manage curriculum, users, videos, content, and system settings.</p>
         </div>
-        <button className="hidden sm:flex bg-[#0038FF] hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md items-center gap-2 transition-all cursor-pointer">
-           <Filter className="w-4 h-4"/> Generate Report
-        </button>
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 flex flex-col justify-between">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 rounded-2xl bg-blue-50 text-[#0038FF]">
-              <Users className="w-6 h-6" />
-            </div>
-            <span className="bg-emerald-50 text-emerald-600 text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> +12%
-            </span>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Total Students</p>
-            <h3 className="text-3xl font-black text-slate-800">{metrics.totalStudents}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 flex flex-col justify-between">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-600">
-              <UserCheck className="w-6 h-6" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Active Parents</p>
-            <h3 className="text-3xl font-black text-slate-800">{metrics.totalParents}</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 flex flex-col justify-between">
-           <div className="flex justify-between items-start mb-4">
-            <div className="p-3 rounded-2xl bg-purple-50 text-purple-600">
-              <BookOpen className="w-6 h-6" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">Total Courses</p>
-            <h3 className="text-3xl font-black text-slate-800">{metrics.totalCourses}</h3>
-          </div>
-        </div>
-
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        
-        {/* Quick Actions */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 lg:col-span-1">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
-            <ShieldAlert className="w-5 h-5 text-amber-500" /> Quick Actions
-          </h3>
-          
-          <div className="space-y-3">
-            <button 
-              onClick={() => setActiveTab('manage-courses')}
-              className="w-full flex items-center justify-between p-4 rounded-2xl bg-blue-50 border border-blue-100 hover:bg-blue-100 transition-colors group cursor-pointer"
-            >
-               <div className="flex items-center gap-3">
-                  <div className="bg-[#0038FF] text-white p-2 rounded-lg">
-                     <BookOpen className="w-4 h-4" />
-                  </div>
-                  <span className="font-bold text-[#0038FF]">Manage Courses</span>
-               </div>
-               <Plus className="w-4 h-4 text-[#0038FF] group-hover:scale-110 transition-transform" />
-            </button>
-
-            <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors group cursor-pointer">
-               <div className="flex items-center gap-3">
-                  <div className="bg-slate-700 text-white p-2 rounded-lg">
-                     <Users className="w-4 h-4" />
-                  </div>
-                  <span className="font-bold text-slate-700">User Management</span>
-               </div>
-            </button>
-            
-            <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors group cursor-pointer">
-               <div className="flex items-center gap-3">
-                  <div className="bg-slate-400 text-white p-2 rounded-lg">
-                     <Settings className="w-4 h-4" />
-                  </div>
-                  <span className="font-bold text-slate-700">System Settings</span>
-               </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-blue-100 lg:col-span-2">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
-            <Clock className="w-5 h-5 text-[#27D8FF]" /> System Activity
-          </h3>
-          
-          <div className="space-y-5">
-            {recentActivity.map(act => (
-              <div key={act.id} className="flex gap-4 items-start border-b border-slate-50 pb-4 last:border-0 last:pb-0">
-                <div className={`p-2.5 rounded-xl shrink-0 ${act.type === 'user' ? 'bg-indigo-100 text-indigo-600' : act.type === 'course' ? 'bg-purple-100 text-purple-600' : act.type === 'student' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                   {act.type === 'user' ? <UserCheck className="w-5 h-5"/> : act.type === 'course' ? <BookOpen className="w-5 h-5" /> : act.type === 'student' ? <Users className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
-                </div>
-                <div className="flex-grow pt-1">
-                  <p className="text-sm font-bold text-slate-800">{act.text}</p>
-                  <p className="text-xs text-slate-400 font-medium mt-1">{act.time}</p>
-                </div>
-                <button className="text-xs font-bold text-[#0038FF] bg-blue-50 px-3 py-1.5 rounded-lg hover:bg-blue-100 mt-1 cursor-pointer">
-                  View
-                </button>
+        <div className="relative z-10 flex items-center gap-4 bg-slate-50 p-3 pr-6 rounded-2xl border border-slate-100">
+           <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0038FF] to-blue-400 flex items-center justify-center shadow-md">
+              <UserCheck className="w-6 h-6 text-white" />
+           </div>
+           <div>
+              <div className="flex items-center gap-2">
+                 <h4 className="font-bold text-slate-800">Super Admin</h4>
+                 <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">
+                    ADMIN ACCESS
+                 </span>
               </div>
-            ))}
-          </div>
+              <p className="text-xs text-slate-500 font-medium">admin@abhishiksha.com</p>
+           </div>
         </div>
+      </div>
+
+      {/* Metrics Overview */}
+      <div className="mb-10">
+         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 px-2">System Overview</h3>
+         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+               <Users className="w-5 h-5 text-indigo-500 mb-2" />
+               <h4 className="text-2xl font-black text-slate-800">{metrics.totalStudents}</h4>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-1">Students</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+               <UserCheck className="w-5 h-5 text-purple-500 mb-2" />
+               <h4 className="text-2xl font-black text-slate-800">{metrics.totalParents}</h4>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-1">Parents</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+               <ShieldAlert className="w-5 h-5 text-red-500 mb-2" />
+               <h4 className="text-2xl font-black text-slate-800">{metrics.totalAdmins}</h4>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-1">Admins</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+               <BookOpen className="w-5 h-5 text-blue-500 mb-2" />
+               <h4 className="text-2xl font-black text-slate-800">{metrics.totalCourses}</h4>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-1">Courses</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+               <FileText className="w-5 h-5 text-emerald-500 mb-2" />
+               <h4 className="text-2xl font-black text-slate-800">{metrics.totalChapters}</h4>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-1">Chapters</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+               <Play className="w-5 h-5 text-amber-500 mb-2" />
+               <h4 className="text-2xl font-black text-slate-800">{metrics.totalVideos}</h4>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-1">Videos</p>
+            </div>
+         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        
+        <button 
+          onClick={() => setActiveTab('content-menu')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-[#0038FF] hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-[#0038FF] mb-4 group-hover:scale-110 transition-transform">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">📚 Content Management</h3>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('curriculum-management')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center">
+          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+            <FileText className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">📖 Curriculum Management</h3>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('video-management')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-red-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center relative overflow-hidden">
+          <div className="absolute top-3 right-3 text-red-500 animate-pulse">
+             <Sparkles className="w-4 h-4" />
+          </div>
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-600 mb-4 group-hover:scale-110 transition-transform">
+            <Video className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">🎥 Video Management</h3>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('user-management')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-purple-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center">
+          <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 mb-4 group-hover:scale-110 transition-transform">
+            <Users className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">👥 User Management</h3>
+        </button>
+        
+        <button 
+          onClick={() => setActiveTab('system-settings')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-slate-800 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 mb-4 group-hover:scale-110 transition-transform">
+            <Settings className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">⚙️ System Settings</h3>
+        </button>
+        
+        <button 
+          onClick={() => setActiveTab('add-motivation')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-amber-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center">
+          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-4 group-hover:scale-110 transition-transform">
+            <Zap className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">🎯 Motivation Shorts</h3>
+        </button>
+        
+        <button 
+          onClick={() => setActiveTab('announcements')}
+          className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 hover:border-indigo-500 hover:shadow-md transition-all group flex flex-col items-center text-center cursor-pointer h-48 justify-center">
+          <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 mb-4 group-hover:scale-110 transition-transform">
+            <Megaphone className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">📢 Announcements</h3>
+        </button>
 
       </div>
     </>
@@ -765,7 +882,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
                 </div>
                 
                 {editingChapterId === chap.id ? (
-                  <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <>
+                    <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500">Video URL</label>
                       <input type="text" value={editVideoUrl} onChange={(e) => setEditVideoUrl(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-purple-500" placeholder="https://youtube.com/..."/>
@@ -787,6 +905,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
                       <label htmlFor={`quiz-${chap.id}`} className="text-sm font-bold text-slate-700 cursor-pointer">Quiz Available</label>
                     </div>
                   </div>
+                  
+                  {/* Real Video Management Section */}
+                  <div className="mt-8 pt-6 border-t border-slate-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                        <Video className="w-4 h-4 text-purple-600" /> Manage Videos ({chapterVideos.length})
+                      </h5>
+                    </div>
+                    
+                    {chapterVideos.length > 0 && (
+                      <div className="space-y-2 mb-6">
+                        {chapterVideos.map(video => (
+                          <div key={video.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                                <Play className="w-4 h-4 fill-current" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-slate-800 line-clamp-1">{video.videoTitle}</p>
+                                <p className="text-xs font-bold text-slate-500">
+                                  {video.teacherName} • {video.language.toUpperCase()} • {video.videoType}
+                                </p>
+                              </div>
+                            </div>
+                            <button onClick={() => handleDeleteVideo(video.id)} className="text-red-500 hover:text-red-700 p-2 cursor-pointer">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="bg-slate-100 p-4 rounded-xl space-y-3">
+                      <h6 className="text-xs font-bold text-slate-600 uppercase">Add New Video</h6>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input type="text" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} placeholder="Video Title" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-purple-500 outline-none"/>
+                        <input type="text" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} placeholder="YouTube URL" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-purple-500 outline-none"/>
+                        <input type="text" value={newVideoTeacher} onChange={(e) => setNewVideoTeacher(e.target.value)} placeholder="Teacher / Channel Name" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-purple-500 outline-none"/>
+                        <div className="flex gap-2">
+                          <select value={newVideoLanguage} onChange={(e) => setNewVideoLanguage(e.target.value)} className="w-1/2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-purple-500 outline-none cursor-pointer">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi</option>
+                          </select>
+                          <select value={newVideoType} onChange={(e) => setNewVideoType(e.target.value)} className="w-1/2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-purple-500 outline-none cursor-pointer">
+                            <option value="explanation">Explanation</option>
+                            <option value="revision">Revision</option>
+                            <option value="practice">Practice</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button onClick={handleAddVideo} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-lg text-sm w-full hover:bg-slate-900 cursor-pointer">
+                        Add Video to Chapter
+                      </button>
+                    </div>
+                    </div>
+                  </>
                 ) : (
                   <div className="mt-4 flex flex-wrap gap-3">
                     {chap.videoUrl ? (
@@ -814,6 +988,328 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
     </>
   );
 
+  const renderUserManagement = () => (
+    <>
+      <div className="mb-8 flex items-center gap-4">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h2 className="text-2xl font-black text-[#0038FF]">User Management</h2>
+          <p className="text-sm text-slate-600 mt-1">Manage students, parents, and administrative accounts.</p>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center">
+            <h4 className="text-xs font-bold text-slate-500 uppercase">Total Users</h4>
+            <p className="text-3xl font-black text-slate-800 mt-2">1,248</p>
+         </div>
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center">
+            <h4 className="text-xs font-bold text-slate-500 uppercase">Students</h4>
+            <p className="text-3xl font-black text-slate-800 mt-2">842</p>
+         </div>
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center">
+            <h4 className="text-xs font-bold text-slate-500 uppercase">Parents</h4>
+            <p className="text-3xl font-black text-slate-800 mt-2">395</p>
+         </div>
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col items-center">
+            <h4 className="text-xs font-bold text-slate-500 uppercase">Admins</h4>
+            <p className="text-3xl font-black text-slate-800 mt-2">11</p>
+         </div>
+      </div>
+      
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
+        <div className="flex justify-between items-center mb-6">
+           <h3 className="text-lg font-bold text-slate-800">User Directory</h3>
+           <select 
+              value={userRoleFilter}
+              onChange={(e) => setUserRoleFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold text-slate-600 outline-none cursor-pointer"
+           >
+              <option value="all">All Roles</option>
+              <option value="student">Students</option>
+              <option value="parent">Parents</option>
+              <option value="admin">Admins</option>
+           </select>
+        </div>
+        <div className="overflow-x-auto mt-4">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-y border-slate-200">
+                <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</th>
+                <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
+                <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Role</th>
+                <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Join Date</th>
+                <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="py-3 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map(user => (
+                <tr key={user.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="py-3 px-4 font-bold text-slate-800">{user.name}</td>
+                  <td className="py-3 px-4 text-sm text-slate-600">{user.email}</td>
+                  <td className="py-3 px-4">
+                    <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-wider ${
+                      user.role === 'admin' ? 'bg-amber-100 text-amber-700' :
+                      user.role === 'parent' ? 'bg-purple-100 text-purple-700' :
+                      'bg-blue-100 text-[#0038FF]'
+                    }`}>{user.role}</span>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-slate-600">{user.joinDate}</td>
+                  <td className="py-3 px-4">
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${
+                      user.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    }`}>{user.status}</span>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <button className="text-slate-400 hover:text-[#0038FF] transition-colors p-1" title="Edit User"><Edit2 className="w-4 h-4"/></button>
+                    <button className="text-slate-400 hover:text-red-500 transition-colors p-1 ml-2" title="Delete User"><Trash2 className="w-4 h-4"/></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredUsers.length === 0 && (
+             <div className="text-center py-8 text-slate-500 font-medium">No users found for this role.</div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  const [sysAppName, setSysAppName] = useState(() => localStorage.getItem('sysAppName') || 'AbhiShiksha');
+  const [sysLang, setSysLang] = useState(() => localStorage.getItem('sysLang') || 'en');
+  const [sysDark, setSysDark] = useState(() => localStorage.getItem('sysDark') === 'true');
+  const [sysNotif, setSysNotif] = useState(() => localStorage.getItem('sysNotif') !== 'false');
+  
+  const handleSaveSettings = () => {
+     localStorage.setItem('sysAppName', sysAppName);
+     localStorage.setItem('sysLang', sysLang);
+     localStorage.setItem('sysDark', sysDark.toString());
+     localStorage.setItem('sysNotif', sysNotif.toString());
+     alert('System settings saved successfully!');
+  };
+
+  const renderSystemSettings = () => (
+    <>
+      <div className="mb-8 flex items-center gap-4">
+        <button 
+          onClick={() => setActiveTab('overview')}
+          className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h2 className="text-2xl font-black text-[#0038FF]">System Settings</h2>
+          <p className="text-sm text-slate-600 mt-1">Configure global application parameters.</p>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 max-w-2xl">
+         <div className="space-y-6">
+            <div>
+               <label className="text-sm font-bold text-slate-700 block mb-2">Application Name</label>
+               <input type="text" value={sysAppName} onChange={e => setSysAppName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold focus:border-[#0038FF] outline-none" />
+            </div>
+            <div>
+               <label className="text-sm font-bold text-slate-700 block mb-2">Default Language</label>
+               <select value={sysLang} onChange={e => setSysLang(e.target.value)} className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold focus:border-[#0038FF] outline-none cursor-pointer">
+                  <option value="en">English</option>
+                  <option value="hi">Hindi (हिंदी)</option>
+               </select>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+               <div>
+                  <h4 className="text-sm font-bold text-slate-800">Dark Mode Support</h4>
+                  <p className="text-xs text-slate-500 mt-1">Allow users to toggle dark mode</p>
+               </div>
+               <button onClick={() => setSysDark(!sysDark)} className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${sysDark ? 'bg-[#0038FF]' : 'bg-slate-300'}`}>
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${sysDark ? 'left-7' : 'left-1'}`} />
+               </button>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+               <div>
+                  <h4 className="text-sm font-bold text-slate-800">Push Notifications</h4>
+                  <p className="text-xs text-slate-500 mt-1">Enable system-wide announcements</p>
+               </div>
+               <button onClick={() => setSysNotif(!sysNotif)} className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${sysNotif ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                  <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${sysNotif ? 'left-7' : 'left-1'}`} />
+               </button>
+            </div>
+            
+            <div className="pt-4 border-t border-slate-100">
+               <button onClick={handleSaveSettings} className="bg-[#0038FF] hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl cursor-pointer shadow-md w-full sm:w-auto">
+                  Save Settings
+               </button>
+            </div>
+         </div>
+      </div>
+    </>
+  );
+
+  const renderVideoManagement = () => (
+    <>
+      <div className="mb-8 flex items-center gap-4">
+        <button 
+          onClick={() => {
+            setActiveTab('overview');
+            setEditingChapterId(null);
+          }}
+          className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer shadow-sm"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div>
+          <h2 className="text-2xl font-black text-red-500 flex items-center gap-2">
+             <Video className="w-6 h-6" /> Video Management
+          </h2>
+          <p className="text-sm text-slate-600 mt-1">Directly attach specific YouTube videos or auto-fetch playlists.</p>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-8 flex flex-col md:flex-row gap-4">
+        <div className="flex-1">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Class / Grade</label>
+          <select 
+            value={curriculumClass} 
+            onChange={(e) => setCurriculumClass(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+          >
+            {[12,11,10,9,8,7,6,5,4,3,2,1].map(c => (
+              <option key={c} value={c.toString()}>Class {c}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Subject</label>
+          <select 
+            value={curriculumSubject} 
+            onChange={(e) => setCurriculumSubject(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+          >
+            {['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Social Science', 'Hindi', 'EVS'].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col sm:flex-row items-end gap-3">
+          <button 
+            onClick={fetchCurriculum}
+            disabled={loadingChapters}
+            className="w-full sm:w-auto px-6 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 cursor-pointer disabled:opacity-50"
+          >
+            {loadingChapters ? 'Loading...' : 'Load Chapters'}
+          </button>
+          <div className="w-full sm:w-auto relative group">
+            <button 
+              onClick={handleAutoFetchVideos}
+              disabled={isAutoFetching}
+              className={`w-full sm:w-auto px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${isAutoFetching ? 'bg-indigo-400 text-white cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-lg cursor-pointer hover:from-indigo-600 hover:to-purple-700 shadow-sm'}`}
+            >
+              <Sparkles className={`w-5 h-5 ${isAutoFetching ? 'animate-spin' : ''}`} />
+              {isAutoFetching ? 'Fetching...' : 'Auto Fetch Best Videos'}
+            </button>
+            <div className="absolute top-full left-0 mt-1 text-[10px] text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity w-full text-center pointer-events-none">
+               Requires chapter selection
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {chapters.map(chap => (
+          <div key={chap.id} className={`border ${editingChapterId === chap.id ? 'border-red-500 ring-2 ring-red-100' : 'border-slate-200'} rounded-2xl p-5 bg-white transition-all`}>
+             <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
+                <div>
+                  <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">Chapter {chap.chapter_number}</span>
+                  <h4 className="text-lg font-black text-slate-800 mt-2">{chap.chapter_name}</h4>
+                </div>
+                {editingChapterId === chap.id ? (
+                   <button onClick={() => setEditingChapterId(null)} className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg text-sm cursor-pointer hover:bg-slate-200">
+                      Close Video Editor
+                   </button>
+                ) : (
+                   <button onClick={() => {
+                      setEditingChapterId(chap.id);
+                      fetchChapterVideos(chap.id);
+                   }} className="px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg text-sm cursor-pointer hover:bg-red-100 flex items-center gap-2">
+                      <Play className="w-4 h-4 fill-current" /> Manage Videos
+                   </button>
+                )}
+             </div>
+
+             {editingChapterId === chap.id && (
+                <div className="mt-6 pt-6 border-t border-slate-100">
+                    <div className="flex justify-between items-center mb-4">
+                      <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                        <Video className="w-4 h-4 text-red-500" /> Chapter Playlist ({chapterVideos.length})
+                      </h5>
+                    </div>
+                    
+                    {chapterVideos.length > 0 && (
+                      <div className="space-y-2 mb-6">
+                        {chapterVideos.map(video => (
+                          <div key={video.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                                <Play className="w-4 h-4 fill-current" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-slate-800 line-clamp-1">{video.videoTitle}</p>
+                                <p className="text-xs font-bold text-slate-500">
+                                  {video.teacherName} • {video.language.toUpperCase()} • {video.videoType}
+                                </p>
+                              </div>
+                            </div>
+                            <button onClick={() => handleDeleteVideo(video.id)} className="text-red-500 hover:text-red-700 p-2 cursor-pointer">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="bg-slate-100 p-4 rounded-xl space-y-3">
+                      <h6 className="text-xs font-bold text-slate-600 uppercase">Add New Video Manually</h6>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input type="text" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} placeholder="Video Title" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                        <input type="text" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} placeholder="YouTube URL" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                        <input type="text" value={newVideoTeacher} onChange={(e) => setNewVideoTeacher(e.target.value)} placeholder="Teacher / Channel Name" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                        <div className="flex gap-2">
+                          <select value={newVideoLanguage} onChange={(e) => setNewVideoLanguage(e.target.value)} className="w-1/2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none cursor-pointer">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi</option>
+                          </select>
+                          <select value={newVideoType} onChange={(e) => setNewVideoType(e.target.value)} className="w-1/2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none cursor-pointer">
+                            <option value="explanation">Explanation</option>
+                            <option value="revision">Revision</option>
+                            <option value="practice">Practice</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button onClick={handleAddVideo} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-lg text-sm w-full hover:bg-slate-900 cursor-pointer">
+                        Add Video to Chapter
+                      </button>
+                    </div>
+                </div>
+             )}
+          </div>
+        ))}
+        {chapters.length === 0 && !loadingChapters && (
+          <div className="text-center py-12 bg-white rounded-3xl border border-slate-200">
+             <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+             <p className="text-slate-500 font-medium">Select a class and subject to manage videos.</p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className="w-full">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -823,6 +1319,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
         {activeTab === 'manage-courses' && renderManageCourses()}
         {activeTab === 'add-course' && renderAddCourse()}
         {activeTab === 'curriculum-management' && renderCurriculumManagement()}
+        {activeTab === 'user-management' && renderUserManagement()}
+        {activeTab === 'system-settings' && renderSystemSettings()}
+        {activeTab === 'video-management' && renderVideoManagement()}
       </div>
     </div>
   );
