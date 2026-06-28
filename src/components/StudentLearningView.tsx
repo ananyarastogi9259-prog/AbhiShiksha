@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Video, BookOpen, Clock, User, ArrowLeft, CheckCircle } from 'lucide-react';
 import type { CurriculumChapter, ChapterVideo } from '../types';
+import { CLASSES_DATA } from '../data';
 
 interface StudentLearningViewProps {
   language: 'en' | 'hi';
@@ -18,9 +19,26 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [activeVideo, setActiveVideo] = useState<ChapterVideo | null>(null);
 
+  const classData = CLASSES_DATA[parseInt(selectedClass)];
+  const availableSubjects = classData?.subjects?.length > 0 
+    ? classData.subjects 
+    : classData?.streams 
+      ? Object.values(classData.streams).flat().filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+      : [];
+
+  useEffect(() => {
+    if (availableSubjects.length > 0) {
+      const isValid = availableSubjects.some(s => s.nameEn === selectedSubject);
+      if (!isValid) {
+        setSelectedSubject(availableSubjects[0].nameEn);
+      }
+    }
+  }, [selectedClass]);
+
   // Fetch Chapters
   useEffect(() => {
     const fetchChapters = async () => {
+      console.log(`[StudentLearningView] Fetching curriculum for Class: ${selectedClass}, Subject: ${selectedSubject}`);
       setLoadingChapters(true);
       setSelectedChapter(null);
       setVideos([]);
@@ -29,6 +47,7 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
         const res = await fetch(`http://localhost:8000/api/curriculum/${selectedClass}/${selectedSubject}`);
         if (res.ok) {
           const data = await res.json();
+          console.log(`[StudentLearningView] Fetched ${data.length} chapters from API for Class ${selectedClass}, Subject ${selectedSubject}:`, data);
           setChapters(data);
         }
       } catch (err) {
@@ -114,15 +133,11 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
               onChange={(e) => setSelectedSubject(e.target.value)}
               className={`w-full border ${borderColor} px-4 py-3 rounded-xl text-sm font-bold cursor-pointer outline-none ${isDark ? 'bg-[#1E293B] text-white' : 'bg-[#F8FBFF] text-slate-800'}`}
             >
-              <option value="Mathematics">Mathematics</option>
-              <option value="English">English</option>
-              <option value="Hindi">Hindi</option>
-              <option value="EVS">EVS (Class 3-5)</option>
-              <option value="Science">Science (Class 6-10)</option>
-              <option value="Social Science">Social Science (Class 6-10)</option>
-              <option value="Physics">Physics (Class 11/12)</option>
-              <option value="Chemistry">Chemistry (Class 11/12)</option>
-              <option value="Biology">Biology (Class 11/12)</option>
+              {availableSubjects.map(subj => (
+                <option key={subj.id} value={subj.nameEn}>
+                  {language === 'hi' && subj.nameHi ? subj.nameHi : subj.nameEn}
+                </option>
+              ))}
             </select>
           </div>
         </div>

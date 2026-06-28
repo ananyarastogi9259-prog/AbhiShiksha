@@ -249,8 +249,8 @@ export const VIDEO_FEED: VideoShort[] = [
 ];
 
 export const ALL_SUBJECTS: Record<string, Subject> = {
-  english: { id: 'english', nameEn: 'English Grammer', nameHi: 'अंग्रेजी व्याकरण', color: 'from-pink-500 to-rose-600', icon: 'BookOpen', chaptersCount: 6, difficulty: 'Easy' },
-  hindi: { id: 'hindi', nameEn: 'Hindi Sahitya', nameHi: 'हिन्दी साहित्य', color: 'from-amber-500 to-orange-600', icon: 'Languages', chaptersCount: 5, difficulty: 'Easy' },
+  english: { id: 'english', nameEn: 'English', nameHi: 'अंग्रेजी', color: 'from-pink-500 to-rose-600', icon: 'BookOpen', chaptersCount: 6, difficulty: 'Easy' },
+  hindi: { id: 'hindi', nameEn: 'Hindi', nameHi: 'हिन्दी', color: 'from-amber-500 to-orange-600', icon: 'Languages', chaptersCount: 5, difficulty: 'Easy' },
   math: { id: 'math', nameEn: 'Mathematics', nameHi: 'गणित', color: 'from-blue-600 to-indigo-600', icon: 'Calculator', chaptersCount: 8, difficulty: 'Hard' },
   evs: { id: 'evs', nameEn: 'EVS', nameHi: 'पर्यावरण अध्ययन', color: 'from-emerald-500 to-teal-600', icon: 'Leaf', chaptersCount: 6, difficulty: 'Medium' },
   gk: { id: 'gk', nameEn: 'General Knowledge', nameHi: 'सामान्य ज्ञान', color: 'from-violet-500 to-purple-600', icon: 'Compass', chaptersCount: 7, difficulty: 'Easy' },
@@ -268,6 +268,7 @@ export const ALL_SUBJECTS: Record<string, Subject> = {
   ip: { id: 'ip', nameEn: 'Informatics Practices', nameHi: 'सूचना अभ्यास', color: 'from-blue-500 to-cyan-600', icon: 'Cpu', chaptersCount: 8, difficulty: 'Medium' },
   history: { id: 'history', nameEn: 'History', nameHi: 'इतिहास', color: 'from-yellow-750 to-amber-900', icon: 'Library', chaptersCount: 8, difficulty: 'Medium' },
   polscience: { id: 'polscience', nameEn: 'Political Science', nameHi: 'राजनीति विज्ञान', color: 'from-sky-600 to-blue-800', icon: 'Shield', chaptersCount: 8, difficulty: 'Medium' },
+  civics: { id: 'civics', nameEn: 'Civics', nameHi: 'नागरिक शास्त्र', color: 'from-sky-500 to-blue-700', icon: 'Landmark', chaptersCount: 8, difficulty: 'Medium' },
   geography: { id: 'geography', nameEn: 'Geography', nameHi: 'भूगोल', color: 'from-teal-600 to-emerald-700', icon: 'Map', chaptersCount: 8, difficulty: 'Medium' },
   psychology: { id: 'psychology', nameEn: 'Psychology', nameHi: 'मनोविज्ञान', color: 'from-purple-500 to-pink-600', icon: 'Brain', chaptersCount: 8, difficulty: 'Hard' },
   sociology: { id: 'sociology', nameEn: 'Sociology', nameHi: 'समाजशास्त्र', color: 'from-indigo-505 to-purple-600', icon: 'Users', chaptersCount: 8, difficulty: 'Medium' }
@@ -277,11 +278,11 @@ export const CLASSES_DATA: Record<number, {
   subjects: Subject[];
   streams?: Record<string, Subject[]>;
 }> = {
-  1: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs, ALL_SUBJECTS.gk, ALL_SUBJECTS.art] },
-  2: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs, ALL_SUBJECTS.gk, ALL_SUBJECTS.art] },
-  3: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs, ALL_SUBJECTS.gk, ALL_SUBJECTS.art] },
-  4: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs, ALL_SUBJECTS.gk, ALL_SUBJECTS.art] },
-  5: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs, ALL_SUBJECTS.gk, ALL_SUBJECTS.art] },
+  1: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math] },
+  2: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs] },
+  3: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs] },
+  4: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs] },
+  5: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.evs] },
   
   6: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.science, ALL_SUBJECTS.sst, ALL_SUBJECTS.computer, ALL_SUBJECTS.sanskrit] },
   7: { subjects: [ALL_SUBJECTS.english, ALL_SUBJECTS.hindi, ALL_SUBJECTS.math, ALL_SUBJECTS.science, ALL_SUBJECTS.sst, ALL_SUBJECTS.computer, ALL_SUBJECTS.sanskrit] },
@@ -293,17 +294,17 @@ export const CLASSES_DATA: Record<number, {
   11: {
     subjects: [],
     streams: {
-      'Science': [ALL_SUBJECTS.physics, ALL_SUBJECTS.chemistry, ALL_SUBJECTS.math, ALL_SUBJECTS.biology, ALL_SUBJECTS.english, ALL_SUBJECTS.computer],
-      'Commerce': [ALL_SUBJECTS.accountancy, ALL_SUBJECTS.business, ALL_SUBJECTS.economics, ALL_SUBJECTS.math, ALL_SUBJECTS.english, ALL_SUBJECTS.ip],
-      'Arts/Humanities': [ALL_SUBJECTS.history, ALL_SUBJECTS.polscience, ALL_SUBJECTS.geography, ALL_SUBJECTS.economics, ALL_SUBJECTS.psychology, ALL_SUBJECTS.sociology, ALL_SUBJECTS.english]
+      'PCM (Science)': [ALL_SUBJECTS.english, ALL_SUBJECTS.physics, ALL_SUBJECTS.chemistry, ALL_SUBJECTS.math],
+      'Commerce': [ALL_SUBJECTS.english, ALL_SUBJECTS.accountancy, ALL_SUBJECTS.business, ALL_SUBJECTS.economics],
+      'Humanities': [ALL_SUBJECTS.english, ALL_SUBJECTS.history, ALL_SUBJECTS.polscience, ALL_SUBJECTS.geography, ALL_SUBJECTS.economics]
     }
   },
   12: {
     subjects: [],
     streams: {
-      'Science': [ALL_SUBJECTS.physics, ALL_SUBJECTS.chemistry, ALL_SUBJECTS.math, ALL_SUBJECTS.biology, ALL_SUBJECTS.english, ALL_SUBJECTS.computer],
-      'Commerce': [ALL_SUBJECTS.accountancy, ALL_SUBJECTS.business, ALL_SUBJECTS.economics, ALL_SUBJECTS.math, ALL_SUBJECTS.english, ALL_SUBJECTS.ip],
-      'Arts/Humanities': [ALL_SUBJECTS.history, ALL_SUBJECTS.polscience, ALL_SUBJECTS.geography, ALL_SUBJECTS.economics, ALL_SUBJECTS.psychology, ALL_SUBJECTS.sociology, ALL_SUBJECTS.english]
+      'PCM (Science)': [ALL_SUBJECTS.english, ALL_SUBJECTS.physics, ALL_SUBJECTS.chemistry, ALL_SUBJECTS.math],
+      'Commerce': [ALL_SUBJECTS.english, ALL_SUBJECTS.accountancy, ALL_SUBJECTS.business, ALL_SUBJECTS.economics],
+      'Humanities': [ALL_SUBJECTS.english, ALL_SUBJECTS.history, ALL_SUBJECTS.polscience, ALL_SUBJECTS.geography, ALL_SUBJECTS.economics]
     }
   }
 };

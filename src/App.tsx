@@ -90,6 +90,8 @@ function MainDashboard({ role }: { role?: string }) {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [activeTopicIndex, setActiveTopicIndex] = useState<number>(0);
+  const [selectedBooksMap, setSelectedBooksMap] = useState<Record<string, string>>({});
+  const [selectedStream, setSelectedStream] = useState<string>('PCM (Science)');
 
   // AI Active Quizzes
   const [currentQuiz, setCurrentQuiz] = useState<QuizQuestion[]>([]);
@@ -145,12 +147,12 @@ function MainDashboard({ role }: { role?: string }) {
   const [tempGrade, setTempGrade] = useState(GRADES[8]);
   const [selectedClassNum, setSelectedClassNum] = useState<number>(9);
   const [classSelectorDesign, setClassSelectorDesign] = useState<'stages-glow' | 'friendly-cards' | 'sleek-badges'>('stages-glow');
-  const [selectedStream, setSelectedStream] = useState<'Science' | 'Commerce' | 'Arts/Humanities'>('Science');
   const [dashboardView, setDashboardView] = useState<'classes' | 'subjects'>('classes');
   const [downloadedSubjects, setDownloadedSubjects] = useState<string[]>([]);
   const [activeSubjectTab, setActiveSubjectTab] = useState<'chapters' | 'videos' | 'tutor' | 'offline'>('chapters');
   const [downloadingSubjectId, setDownloadingSubjectId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dashboardChapters, setDashboardChapters] = useState<any[]>([]);
 
   // Short Video TikTok simulation state
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -277,6 +279,28 @@ function MainDashboard({ role }: { role?: string }) {
   useEffect(() => {
     fetchMindfulShorts();
   }, []);
+
+  useEffect(() => {
+    const fetchClassChapters = async () => {
+      console.log(`[Dashboard] Selected Class for curriculum fetch: ${selectedClassNum}`);
+      try {
+        const res = await fetch(`http://localhost:8000/api/curriculum/class/${selectedClassNum}`);
+        if (res.ok) {
+          const data = await res.json();
+          console.log(`[Dashboard] Fetched ${data.length} chapters from API for Class ${selectedClassNum}:`, data);
+          
+          // Log unique subjects fetched from this payload
+          const uniqueSubjects = [...new Set(data.map((c: any) => c.subject))];
+          console.log(`[Dashboard] Unique Subjects available from API data:`, uniqueSubjects);
+          
+          setDashboardChapters(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch class chapters", err);
+      }
+    };
+    fetchClassChapters();
+  }, [selectedClassNum]);
 
   // Track active study interactions (1-second precision)
   useEffect(() => {
@@ -2992,6 +3016,21 @@ function MainDashboard({ role }: { role?: string }) {
 
                     {/* Subjects Grid (Syllabus Course Content) */}
                     <div className="space-y-3">
+                      {(selectedClassNum === 11 || selectedClassNum === 12) && (
+                        <div className="mb-4 bg-white dark:bg-[#0C1224] p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                          <span className="text-xs uppercase font-black text-slate-800 dark:text-slate-100">Select Stream:</span>
+                          <select 
+                            className="appearance-none bg-slate-50 dark:bg-[#151E32] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-sm font-bold p-2.5 rounded-xl outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all"
+                            value={selectedStream}
+                            onChange={(e) => setSelectedStream(e.target.value)}
+                          >
+                            <option value="PCM (Science)">PCM (Science)</option>
+                            <option value="Commerce">Commerce</option>
+                            <option value="Humanities">Humanities</option>
+                          </select>
+                        </div>
+                      )}
+                      
                       <h4 className="text-xs uppercase tracking-wider text-slate-400 font-extrabold">
                         {language === 'hi' ? 'उपलब्ध विषय और अध्याय' : 'Available Board Syllabus Subjects'}
                       </h4>
@@ -2999,52 +3038,129 @@ function MainDashboard({ role }: { role?: string }) {
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {(() => {
                           const classObj = CLASSES_DATA[selectedClassNum] || CLASSES_DATA[9];
-                          const subjectsForClass = classObj.subjects?.length > 0 ? classObj.subjects : (classObj.streams ? [
-                            ...(classObj.streams['Science'] || []),
-                            ...(classObj.streams['Commerce'] || []),
-                            ...(classObj.streams['Arts/Humanities'] || [])
-                          ] : SUBJECTS);
-                          return subjectsForClass;
-                        })().map((s) => (
-                          <div 
-                            key={s.id} 
-                            className="bg-white dark:bg-[#0C1224] p-4 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between hover:shadow-xs transition-all"
-                          >
-                            <div>
-                              <div className="flex justify-between items-center bg-transparent">
-                                <span className="text-[9px] bg-blue-50 dark:bg-blue-950/40 text-[#0038FF] dark:text-[#27D8FF] px-2 py-0.5 rounded font-black">
-                                  Syllabus Map
-                                </span>
-                                <span className="text-amber-500 text-[10px] font-bold flex items-center gap-0.5">★ {s.chaptersCount} chapters</span>
-                              </div>
-                              <h4 className="text-sm font-black text-slate-900 dark:text-white mt-2">
-                                {language === 'hi' ? s.nameHi : s.nameEn}
-                              </h4>
-                              <p className="text-[10px] text-slate-400 mt-1 leading-normal">Free low-data textbooks synced with Bihar, MP & UP Board questions.</p>
-                            </div>
+                          if (classObj.streams) {
+                            return classObj.streams[selectedStream] || classObj.streams['PCM (Science)'];
+                          }
+                          return classObj.subjects?.length > 0 ? classObj.subjects : SUBJECTS;
+                        })().map((s) => {
+                          const subjectChapters = dashboardChapters.filter((ch: any) => ch.subject === s.nameEn);
+                          const booksForSubject = Array.from(new Set(subjectChapters.map((c: any) => c.book_name).filter(b => b))) as string[];
+                          const currentBook = selectedBooksMap[s.id] || (booksForSubject.length > 0 ? booksForSubject[0] : "");
+                          const chaptersToShow = (booksForSubject.length > 1 && currentBook)
+                            ? subjectChapters.filter((c: any) => c.book_name === currentBook)
+                            : subjectChapters;
 
-                            <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-900">
-                              <span className="text-[9px] text-slate-400 block font-bold mb-1.5 uppercase">Select Chapter:</span>
-                              <div className="space-y-1">
-                                {CHAPTERS.filter(ch => ch.subjectId === s.id).map((ch) => (
-                                  <button
-                                    key={ch.id}
-                                    onClick={() => {
-                                      setSelectedSubject(s);
-                                      setSelectedChapter(ch);
-                                      setActiveTopicIndex(0);
-                                      triggerCelebration(`Loaded chapter ${ch.titleEn}`);
+                          return (
+                            <div 
+                              key={s.id} 
+                              className="bg-white dark:bg-[#0C1224] p-4 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between hover:shadow-xs transition-all"
+                            >
+                              <div>
+                                <div className="flex justify-between items-center bg-transparent">
+                                  <span className="text-[9px] bg-blue-50 dark:bg-blue-950/40 text-[#0038FF] dark:text-[#27D8FF] px-2 py-0.5 rounded font-black">
+                                    Syllabus Map
+                                  </span>
+                                  <span className="text-amber-500 text-[10px] font-bold flex items-center gap-0.5">★ {s.chaptersCount} chapters</span>
+                                </div>
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white mt-2">
+                                  {language === 'hi' ? s.nameHi : s.nameEn}
+                                </h4>
+                                <p className="text-[10px] text-slate-400 mt-1 leading-normal">Free low-data textbooks synced with Bihar, MP & UP Board questions.</p>
+                              </div>
+
+                              <div className="mt-4 pt-3 border-t border-slate-50 dark:border-slate-900">
+                                {booksForSubject.length > 1 && (
+                                  <div className="mb-3">
+                                    <span className="text-[9px] text-slate-400 block font-bold mb-1.5 uppercase">Select Book:</span>
+                                    <div className="w-full relative">
+                                      <select 
+                                        className="w-full appearance-none bg-slate-50 dark:bg-[#151E32] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[10px] font-bold p-2 rounded-lg outline-none cursor-pointer focus:ring-1 focus:ring-blue-500/50 shadow-sm transition-all"
+                                        value={currentBook}
+                                        onChange={(e) => setSelectedBooksMap(prev => ({...prev, [s.id]: e.target.value}))}
+                                      >
+                                        {booksForSubject.map(b => (
+                                          <option key={b} value={b} className="py-2">{b}</option>
+                                        ))}
+                                      </select>
+                                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                        <svg width="8" height="5" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                          <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"/>
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                <span className="text-[9px] text-slate-400 block font-bold mb-1.5 uppercase">Select Chapter:</span>
+                                <div className="w-full relative">
+                                  <select 
+                                    className="w-full appearance-none bg-white dark:bg-[#1A233A] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-[11px] font-bold p-2.5 rounded-xl outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all"
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        const ch = dashboardChapters.find((c: any) => c.id === e.target.value);
+                                        if (ch) {
+                                          setSelectedSubject(s);
+                                          setSelectedChapter({
+                                            id: ch.id,
+                                            titleEn: ch.chapter_name,
+                                            titleHi: ch.chapter_name,
+                                            subjectId: s.id,
+                                            coinsReward: 10,
+                                            xpReward: 50,
+                                            topicsCount: 1,
+                                            duration: '30 mins'
+                                          });
+                                          setActiveTopicIndex(0);
+                                          triggerCelebration(`Loaded chapter: ${ch.chapter_name}`);
+                                        }
+                                        e.target.value = "";
+                                      }
                                     }}
-                                    className="w-full text-left p-1.5 rounded-lg bg-slate-55 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-[10.5px] font-black text-[#0038FF] dark:text-[#27D8FF] flex justify-between items-center cursor-pointer"
+                                    defaultValue=""
                                   >
-                                    <span className="truncate max-w-[170px]">{language === 'hi' ? ch.titleHi : ch.titleEn}</span>
-                                    <span className="text-[8px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-355 px-1 py-0.2 rounded font-mono">Free</span>
-                                  </button>
-                                ))}
+                                    <option value="" disabled className="text-slate-400 bg-white dark:bg-[#1A233A]">
+                                      {language === 'hi' ? '-- अध्याय चुनें --' : '-- Choose Chapter --'}
+                                    </option>
+                                    {s.id === 'sst' ? (
+                                      ['History', 'Geography', 'Civics', 'Economics'].map((sub) => {
+                                        const subChapters = dashboardChapters.filter((ch: any) => ch.subject === sub);
+                                        if (subChapters.length === 0) return null;
+                                        return (
+                                          <optgroup key={sub} label={sub} className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-bold italic py-1">
+                                            {subChapters.map((ch: any) => (
+                                              <option 
+                                                key={ch.id} 
+                                                value={ch.id}
+                                                className="py-2 bg-white dark:bg-[#1A233A] text-slate-800 dark:text-slate-100 font-normal not-italic"
+                                              >
+                                                {ch.chapter_number}. {ch.chapter_name}
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                        );
+                                      })
+                                    ) : (
+                                      chaptersToShow.map((ch: any) => (
+                                        <option 
+                                          key={ch.id} 
+                                          value={ch.id}
+                                          className="py-2 bg-white dark:bg-[#1A233A] text-slate-800 dark:text-slate-100"
+                                        >
+                                          {ch.chapter_number}. {ch.chapter_name}
+                                        </option>
+                                      ))
+                                    )}
+                                  </select>
+                                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"/>
+                                    </svg>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

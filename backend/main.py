@@ -241,14 +241,32 @@ class ChapterUpdate(BaseModel):
 class ChapterResponse(ChapterBase):
     id: str
 
+@app.get("/api/curriculum/class/{class_grade}", response_model=List[ChapterResponse])
+async def get_curriculum_by_class(class_grade: str):
+    db = get_database()
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    cursor = db["curriculum"].find({"class_grade": class_grade}).sort([("subject", 1), ("chapter_number", 1)])
+    chapters = await cursor.to_list(length=1000)
+    
+    for chapter in chapters:
+        chapter["id"] = str(chapter.pop("_id"))
+        
+    return chapters
+
 @app.get("/api/curriculum/{class_grade}/{subject}", response_model=List[ChapterResponse])
 async def get_curriculum(class_grade: str, subject: str):
     db = get_database()
     if db is None:
         raise HTTPException(status_code=503, detail="Database not available")
     
-    cursor = db["curriculum"].find({"class_grade": class_grade, "subject": subject}).sort("chapter_number", 1)
-    chapters = await cursor.to_list(length=100)
+    query = {"class_grade": class_grade, "subject": subject}
+    if subject == "Social Science":
+        query["subject"] = {"$in": ["History", "Geography", "Civics", "Economics"]}
+        
+    cursor = db["curriculum"].find(query).sort([("subject", 1), ("chapter_number", 1)])
+    chapters = await cursor.to_list(length=1000)
     
     for chapter in chapters:
         chapter["id"] = str(chapter.pop("_id"))

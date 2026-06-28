@@ -4,6 +4,7 @@ import {
   Clock, Plus, Filter, TrendingUp, Video, FileText, Zap, Megaphone, ArrowLeft, Trash2, Edit2, Check, X, Play, Sparkles
 } from 'lucide-react';
 import type { Course, CurriculumChapter, ChapterVideo } from '../types';
+import { CLASSES_DATA } from '../data';
 
 interface AdminDashboardProps {
   language?: 'en' | 'hi';
@@ -17,6 +18,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
   const [curriculumSubject, setCurriculumSubject] = useState('Science');
   const [chapters, setChapters] = useState<CurriculumChapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
+  
+  const classData = CLASSES_DATA[parseInt(curriculumClass)];
+  const availableSubjects = classData?.subjects?.length > 0 
+    ? classData.subjects 
+    : classData?.streams 
+      ? Object.values(classData.streams).flat().filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+      : [];
+
+  useEffect(() => {
+    if (availableSubjects.length > 0) {
+      const isValid = availableSubjects.some(s => s.nameEn === curriculumSubject);
+      if (!isValid) {
+        setCurriculumSubject(availableSubjects[0].nameEn);
+      }
+    }
+  }, [curriculumClass]);
   
   // Curriculum Edit State
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
@@ -843,15 +860,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
               onChange={(e) => setCurriculumSubject(e.target.value)}
               className="w-full bg-[#F8FBFF] border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold text-slate-800 cursor-pointer"
             >
-              <option value="Mathematics">Mathematics</option>
-              <option value="English">English</option>
-              <option value="Hindi">Hindi</option>
-              <option value="EVS">EVS (Class 3-5)</option>
-              <option value="Science">Science (Class 6-10)</option>
-              <option value="Social Science">Social Science (Class 6-10)</option>
-              <option value="Physics">Physics (Class 11/12)</option>
-              <option value="Chemistry">Chemistry (Class 11/12)</option>
-              <option value="Biology">Biology (Class 11/12)</option>
+              {availableSubjects.map(subj => (
+                <option key={subj.id} value={subj.nameEn}>
+                  {language === 'hi' && subj.nameHi ? subj.nameHi : subj.nameEn}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -1192,8 +1205,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
             onChange={(e) => setCurriculumSubject(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
           >
-            {['Mathematics', 'Science', 'Physics', 'Chemistry', 'Biology', 'English', 'Social Science', 'Hindi', 'EVS'].map(s => (
-              <option key={s} value={s}>{s}</option>
+            {availableSubjects.map(subj => (
+              <option key={subj.id} value={subj.nameEn}>
+                {language === 'hi' && subj.nameHi ? subj.nameHi : subj.nameEn}
+              </option>
             ))}
           </select>
         </div>
