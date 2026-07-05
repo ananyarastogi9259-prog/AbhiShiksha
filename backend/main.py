@@ -316,7 +316,11 @@ async def update_chapter(chapter_id: str, chapter_update: ChapterUpdate):
 # --- Video Management APIs ---
 
 class VideoBase(BaseModel):
-    chapter_id: str
+    classGrade: str
+    stream: Optional[str] = ""
+    subject: str
+    book: Optional[str] = ""
+    chapter: str
     videoTitle: str
     videoUrl: str
     teacherName: str = ""
@@ -330,13 +334,23 @@ class VideoCreate(VideoBase):
 class VideoResponse(VideoBase):
     id: str
 
-@app.get("/api/videos/{chapter_id}", response_model=List[VideoResponse])
-async def get_videos(chapter_id: str):
+@app.get("/api/videos", response_model=List[VideoResponse])
+async def get_videos(classGrade: str, subject: str, chapter: str, stream: str = "", book: str = ""):
     db = get_database()
     if db is None:
         raise HTTPException(status_code=503, detail="Database not available")
     
-    cursor = db["chapter_videos"].find({"chapter_id": chapter_id})
+    query = {
+        "classGrade": classGrade,
+        "subject": subject,
+        "chapter": chapter
+    }
+    if stream:
+        query["stream"] = stream
+    if book:
+        query["book"] = book
+        
+    cursor = db["chapter_videos"].find(query)
     videos = await cursor.to_list(length=100)
     
     for video in videos:

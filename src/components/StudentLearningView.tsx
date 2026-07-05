@@ -10,11 +10,14 @@ interface StudentLearningViewProps {
 
 const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, theme }) => {
   const [selectedClass, setSelectedClass] = useState('10');
-  const [selectedSubject, setSelectedSubject] = useState('Mathematics');
+  const [selectedStream, setSelectedStream] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('Science');
+  const [selectedBook, setSelectedBook] = useState('');
+  const [selectedChapter, setSelectedChapter] = useState('');
+
   const [chapters, setChapters] = useState<CurriculumChapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
   
-  const [selectedChapter, setSelectedChapter] = useState<CurriculumChapter | null>(null);
   const [videos, setVideos] = useState<ChapterVideo[]>([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [activeVideo, setActiveVideo] = useState<ChapterVideo | null>(null);
@@ -35,20 +38,26 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
     }
   }, [selectedClass]);
 
-  // Fetch Chapters
+  // Fetch Chapters to populate Book and Chapter dropdowns
   useEffect(() => {
     const fetchChapters = async () => {
-      console.log(`[StudentLearningView] Fetching curriculum for Class: ${selectedClass}, Subject: ${selectedSubject}`);
       setLoadingChapters(true);
-      setSelectedChapter(null);
-      setVideos([]);
-      setActiveVideo(null);
       try {
         const res = await fetch(`http://localhost:8000/api/curriculum/${selectedClass}/${selectedSubject}`);
         if (res.ok) {
           const data = await res.json();
-          console.log(`[StudentLearningView] Fetched ${data.length} chapters from API for Class ${selectedClass}, Subject ${selectedSubject}:`, data);
           setChapters(data);
+          
+          const books = Array.from(new Set(data.map((c: any) => c.book_name).filter(b => b))) as string[];
+          if (books.length > 0) {
+            setSelectedBook(books[0]);
+            const chaps = data.filter((c: any) => c.book_name === books[0]);
+            if (chaps.length > 0) setSelectedChapter(chaps[0].chapter_name);
+          } else {
+            setSelectedBook('');
+            if (data.length > 0) setSelectedChapter(data[0].chapter_name);
+            else setSelectedChapter('');
+          }
         }
       } catch (err) {
         console.error('Error fetching chapters', err);
@@ -59,26 +68,37 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
     fetchChapters();
   }, [selectedClass, selectedSubject]);
 
-  // Fetch Videos for Chapter
-  const handleSelectChapter = async (chap: CurriculumChapter) => {
-    setSelectedChapter(chap);
-    setLoadingVideos(true);
-    setActiveVideo(null);
-    try {
-      const res = await fetch(`http://localhost:8000/api/videos/${chap.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setVideos(data);
-        if (data.length > 0) {
-          setActiveVideo(data[0]);
-        }
+  // Fetch Videos when dropdowns change
+  useEffect(() => {
+    const fetchVideosForSelection = async () => {
+      if (!selectedClass || !selectedSubject || !selectedChapter) {
+        setVideos([]);
+        return;
       }
-    } catch (err) {
-      console.error('Error fetching videos', err);
-    } finally {
-      setLoadingVideos(false);
-    }
-  };
+      setLoadingVideos(true);
+      setActiveVideo(null);
+      try {
+        const qs = new URLSearchParams({
+          classGrade: selectedClass,
+          subject: selectedSubject,
+          chapter: selectedChapter,
+          stream: selectedStream,
+          book: selectedBook
+        }).toString();
+        const res = await fetch(`http://localhost:8000/api/videos?${qs}`);
+        if (res.ok) {
+          const data = await res.json();
+          setVideos(data);
+          if (data.length > 0) setActiveVideo(data[0]);
+        }
+      } catch (err) {
+        console.error('Error fetching videos', err);
+      } finally {
+        setLoadingVideos(false);
+      }
+    };
+    fetchVideosForSelection();
+  }, [selectedClass, selectedSubject, selectedChapter, selectedBook, selectedStream]);
 
   const getYoutubeEmbedUrl = (url: string) => {
     const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
@@ -92,6 +112,9 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
   const textColor = isDark ? 'text-slate-100' : 'text-slate-800';
   const mutedText = isDark ? 'text-slate-400' : 'text-slate-500';
 
+  const derivedBooks = Array.from(new Set(chapters.map((c: any) => c.book_name).filter(b => b))) as string[];
+  const derivedChapters = (derivedBooks.length > 0 && selectedBook) ? chapters.filter(c => c.book_name === selectedBook) : chapters;
+
   return (
     <div className={`max-w-6xl mx-auto ${textColor}`}>
       <div className={`mb-6 p-6 rounded-3xl border ${borderColor} ${bgColor} shadow-sm`}>
@@ -100,33 +123,43 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
           {language === 'hi' ? 'एनसीईआरटी वीडियो पोर्टल' : 'NCERT Video Portal'}
         </h2>
         
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="space-y-2">
             <label className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>
-              {language === 'hi' ? 'कक्षा चुनें' : 'Select Class'}
+              {language === 'hi' ? 'कक्षा चुनें' : 'Class'}
             </label>
             <select 
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               className={`w-full border ${borderColor} px-4 py-3 rounded-xl text-sm font-bold cursor-pointer outline-none ${isDark ? 'bg-[#1E293B] text-white' : 'bg-[#F8FBFF] text-slate-800'}`}
             >
-              <option value="1">Class 1</option>
-              <option value="2">Class 2</option>
-              <option value="3">Class 3</option>
-              <option value="4">Class 4</option>
-              <option value="5">Class 5</option>
-              <option value="6">Class 6</option>
-              <option value="7">Class 7</option>
-              <option value="8">Class 8</option>
-              <option value="9">Class 9</option>
-              <option value="10">Class 10</option>
-              <option value="11">Class 11</option>
-              <option value="12">Class 12</option>
+              {[12,11,10,9,8,7,6,5,4,3,2,1].map(c => (
+                <option key={c} value={c.toString()}>Class {c}</option>
+              ))}
             </select>
           </div>
-          <div className="flex-1 space-y-2">
+          
+          {(selectedClass === '11' || selectedClass === '12') && (
+            <div className="space-y-2">
+              <label className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>
+                Stream
+              </label>
+              <select 
+                value={selectedStream}
+                onChange={(e) => setSelectedStream(e.target.value)}
+                className={`w-full border ${borderColor} px-4 py-3 rounded-xl text-sm font-bold cursor-pointer outline-none ${isDark ? 'bg-[#1E293B] text-white' : 'bg-[#F8FBFF] text-slate-800'}`}
+              >
+                <option value="">Common</option>
+                <option value="Science">Science</option>
+                <option value="Commerce">Commerce</option>
+                <option value="Humanities">Humanities</option>
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-2">
             <label className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>
-              {language === 'hi' ? 'विषय चुनें' : 'Select Subject'}
+              {language === 'hi' ? 'विषय चुनें' : 'Subject'}
             </label>
             <select 
               value={selectedSubject}
@@ -141,55 +174,57 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
             </select>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {derivedBooks.length > 0 && (
+            <div className="space-y-2">
+              <label className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>Book</label>
+              <select 
+                value={selectedBook}
+                onChange={(e) => {
+                  setSelectedBook(e.target.value);
+                  const newChaps = chapters.filter(c => c.book_name === e.target.value);
+                  if (newChaps.length > 0) setSelectedChapter(newChaps[0].chapter_name);
+                }}
+                className={`w-full border ${borderColor} px-4 py-3 rounded-xl text-sm font-bold cursor-pointer outline-none ${isDark ? 'bg-[#1E293B] text-white' : 'bg-[#F8FBFF] text-slate-800'}`}
+              >
+                {derivedBooks.map(book => (
+                  <option key={book} value={book}>{book}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <label className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>Chapter</label>
+            <select 
+              value={selectedChapter}
+              onChange={(e) => setSelectedChapter(e.target.value)}
+              className={`w-full border ${borderColor} px-4 py-3 rounded-xl text-sm font-bold cursor-pointer outline-none ${isDark ? 'bg-[#1E293B] text-white' : 'bg-[#F8FBFF] text-slate-800'}`}
+            >
+              {derivedChapters.length === 0 && <option value="">No chapters found</option>}
+              {derivedChapters.map(chap => (
+                <option key={chap.id} value={chap.chapter_name}>
+                  {chap.chapter_number}. {chap.chapter_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {!selectedChapter ? (
-        <div className={`p-6 rounded-3xl border ${borderColor} ${bgColor}`}>
-          <h3 className={`text-lg font-bold mb-4 ${textColor}`}>
-            {language === 'hi' ? 'अध्याय (Chapters)' : 'Chapters'}
-          </h3>
-          {loadingChapters ? (
-            <div className={`py-10 text-center font-bold ${mutedText}`}>Loading Chapters...</div>
-          ) : chapters.length === 0 ? (
-            <div className={`py-10 text-center font-bold ${mutedText}`}>No chapters found.</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {chapters.map(chap => (
-                <div 
-                  key={chap.id} 
-                  onClick={() => handleSelectChapter(chap)}
-                  className={`border ${borderColor} rounded-2xl p-5 ${panelBg} cursor-pointer hover:border-purple-400 hover:shadow-md transition-all group`}
-                >
-                  <span className="text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-1 rounded tracking-wider uppercase">
-                    Chapter {chap.chapter_number}
-                  </span>
-                  <h4 className={`text-base font-black mt-3 group-hover:text-purple-600 transition-colors ${textColor}`}>
-                    {chap.chapter_name}
-                  </h4>
-                  {chap.book_name && (
-                    <p className={`text-xs font-bold mt-1 ${mutedText}`}>{chap.book_name}</p>
-                  )}
-                  <div className="mt-4 flex items-center justify-between text-xs font-bold text-purple-600">
-                    <span className="flex items-center gap-1"><Play className="w-3 h-3"/> View Videos</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className={`p-10 text-center rounded-3xl border ${borderColor} ${bgColor}`}>
+          <Video className={`w-12 h-12 mx-auto mb-4 ${mutedText} opacity-50`} />
+          <p className={`font-bold ${mutedText}`}>Please select a chapter to view videos.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Video Player Area */}
           <div className={`lg:col-span-2 rounded-3xl border ${borderColor} ${bgColor} overflow-hidden shadow-sm flex flex-col`}>
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <button 
-                onClick={() => setSelectedChapter(null)}
-                className={`flex items-center gap-2 text-sm font-bold ${mutedText} hover:text-purple-600`}
-              >
-                <ArrowLeft className="w-4 h-4" /> Back to Chapters
-              </button>
-              <span className="text-xs font-black bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                CH {selectedChapter.chapter_number}: {selectedChapter.chapter_name}
+              <span className="text-xs font-black bg-purple-100 text-purple-700 px-3 py-1.5 rounded">
+                {selectedChapter}
               </span>
             </div>
             
@@ -202,9 +237,9 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
                   title={activeVideo.videoTitle}
                 ></iframe>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900">
                   <Video className="w-12 h-12 mb-2 opacity-50" />
-                  <p className="font-bold">{loadingVideos ? 'Loading Videos...' : 'No videos available for this chapter.'}</p>
+                  <p className="font-bold">{loadingVideos ? 'Loading Videos...' : 'Videos will be added soon.'}</p>
                 </div>
               )}
             </div>
@@ -261,7 +296,7 @@ const StudentLearningView: React.FC<StudentLearningViewProps> = ({ language, the
                 </div>
               ))}
               {!loadingVideos && videos.length === 0 && (
-                 <p className="text-xs text-slate-500 text-center font-bold py-4">Check back later for new videos!</p>
+                 <p className="text-xs text-slate-500 text-center font-bold py-4">Videos will be added soon.</p>
               )}
             </div>
           </div>

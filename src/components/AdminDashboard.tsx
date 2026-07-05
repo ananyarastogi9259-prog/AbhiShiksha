@@ -99,6 +99,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
   };
 
   // Video Management State
+  const [videoClass, setVideoClass] = useState('10');
+  const [videoStream, setVideoStream] = useState('');
+  const [videoSubject, setVideoSubject] = useState('Science');
+  const [videoBook, setVideoBook] = useState('');
+  const [videoChapter, setVideoChapter] = useState('');
+  
+  const [videoChapters, setVideoChapters] = useState<CurriculumChapter[]>([]);
+  const [loadingVideoChapters, setLoadingVideoChapters] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'video-management') {
+      const fetchVideoChaptersData = async () => {
+        if (!videoClass || !videoSubject) return;
+        setLoadingVideoChapters(true);
+        try {
+          const res = await fetch(`http://localhost:8000/api/curriculum/${videoClass}/${videoSubject}`);
+          if (res.ok) {
+            const data = await res.json();
+            setVideoChapters(data);
+            
+            // Auto-select book and chapter if possible
+            const books = Array.from(new Set(data.map((c: any) => c.book_name).filter(b => b))) as string[];
+            if (books.length > 0) {
+              setVideoBook(books[0]);
+              const chaps = data.filter((c: any) => c.book_name === books[0]);
+              if (chaps.length > 0) setVideoChapter(chaps[0].chapter_name);
+            } else {
+              setVideoBook('');
+              if (data.length > 0) setVideoChapter(data[0].chapter_name);
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoadingVideoChapters(false);
+        }
+      };
+      fetchVideoChaptersData();
+    }
+  }, [activeTab, videoClass, videoSubject]);
+
+  useEffect(() => {
+    if (activeTab === 'video-management' && videoClass && videoSubject && videoChapter) {
+      fetchChapterVideosStr();
+    }
+  }, [activeTab, videoClass, videoSubject, videoChapter, videoBook, videoStream]);
+
   const [chapterVideos, setChapterVideos] = useState<ChapterVideo[]>([]);
   const [newVideoTitle, setNewVideoTitle] = useState('');
   const [newVideoUrl, setNewVideoUrl] = useState('');
@@ -107,9 +154,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
   const [newVideoDuration, setNewVideoDuration] = useState('');
   const [newVideoType, setNewVideoType] = useState('explanation');
 
-  const fetchChapterVideos = async (chapterId: string) => {
+  const fetchChapterVideosStr = async () => {
+    if (!videoClass || !videoSubject || !videoChapter) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/videos/${chapterId}`);
+      const qs = new URLSearchParams({
+        classGrade: videoClass,
+        subject: videoSubject,
+        chapter: videoChapter,
+        stream: videoStream,
+        book: videoBook
+      }).toString();
+      const res = await fetch(`http://localhost:8000/api/videos?${qs}`);
       if (res.ok) {
         const data = await res.json();
         setChapterVideos(data);
@@ -120,13 +175,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
   };
 
   const handleAddVideo = async () => {
-    if (!editingChapterId || !newVideoTitle || !newVideoUrl) return;
+    if (!videoClass || !videoSubject || !videoChapter || !newVideoTitle || !newVideoUrl) return;
     try {
       const res = await fetch(`http://localhost:8000/api/videos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chapter_id: editingChapterId,
+          classGrade: videoClass,
+          stream: videoStream,
+          subject: videoSubject,
+          book: videoBook,
+          chapter: videoChapter,
           videoTitle: newVideoTitle,
           videoUrl: newVideoUrl,
           teacherName: newVideoTeacher,
@@ -136,7 +195,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
         })
       });
       if (res.ok) {
-        fetchChapterVideos(editingChapterId);
+        fetchChapterVideosStr();
         setNewVideoTitle('');
         setNewVideoUrl('');
         setNewVideoTeacher('');
@@ -150,11 +209,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
   };
 
   const handleDeleteVideo = async (videoId: string) => {
-    if (!editingChapterId) return;
     try {
       const res = await fetch(`http://localhost:8000/api/videos/${videoId}`, { method: 'DELETE' });
       if (res.ok) {
-        fetchChapterVideos(editingChapterId);
+        fetchChapterVideosStr();
       }
     } catch (err) {
       console.error('Error deleting video', err);
@@ -1165,165 +1223,196 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ language = 'en' }) => {
     </>
   );
 
-  const renderVideoManagement = () => (
-    <>
-      <div className="mb-8 flex items-center gap-4">
-        <button 
-          onClick={() => {
-            setActiveTab('overview');
-            setEditingChapterId(null);
-          }}
-          className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer shadow-sm"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h2 className="text-2xl font-black text-red-500 flex items-center gap-2">
-             <Video className="w-6 h-6" /> Video Management
-          </h2>
-          <p className="text-sm text-slate-600 mt-1">Directly attach specific YouTube videos or auto-fetch playlists.</p>
-        </div>
-      </div>
+  const renderVideoManagement = () => {
+    const classDataForVideo = CLASSES_DATA[parseInt(videoClass)];
+    const availableSubjectsForVideo = classDataForVideo?.subjects?.length > 0 
+      ? classDataForVideo.subjects 
+      : classDataForVideo?.streams 
+        ? Object.values(classDataForVideo.streams).flat().filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+        : [];
+        
+    const videoBooks = Array.from(new Set(videoChapters.map((c: any) => c.book_name).filter(b => b))) as string[];
+    const chaptersForBook = (videoBooks.length > 0 && videoBook) ? videoChapters.filter(c => c.book_name === videoBook) : videoChapters;
 
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-8 flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Class / Grade</label>
-          <select 
-            value={curriculumClass} 
-            onChange={(e) => setCurriculumClass(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
-          >
-            {[12,11,10,9,8,7,6,5,4,3,2,1].map(c => (
-              <option key={c} value={c.toString()}>Class {c}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Subject</label>
-          <select 
-            value={curriculumSubject} 
-            onChange={(e) => setCurriculumSubject(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
-          >
-            {availableSubjects.map(subj => (
-              <option key={subj.id} value={subj.nameEn}>
-                {language === 'hi' && subj.nameHi ? subj.nameHi : subj.nameEn}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col sm:flex-row items-end gap-3">
+    return (
+      <>
+        <div className="mb-8 flex items-center gap-4">
           <button 
-            onClick={fetchCurriculum}
-            disabled={loadingChapters}
-            className="w-full sm:w-auto px-6 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-900 cursor-pointer disabled:opacity-50"
+            onClick={() => setActiveTab('overview')}
+            className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 cursor-pointer shadow-sm"
           >
-            {loadingChapters ? 'Loading...' : 'Load Chapters'}
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="w-full sm:w-auto relative group">
-            <button 
-              onClick={handleAutoFetchVideos}
-              disabled={isAutoFetching}
-              className={`w-full sm:w-auto px-6 py-3 font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${isAutoFetching ? 'bg-indigo-400 text-white cursor-not-allowed' : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-lg cursor-pointer hover:from-indigo-600 hover:to-purple-700 shadow-sm'}`}
-            >
-              <Sparkles className={`w-5 h-5 ${isAutoFetching ? 'animate-spin' : ''}`} />
-              {isAutoFetching ? 'Fetching...' : 'Auto Fetch Best Videos'}
-            </button>
-            <div className="absolute top-full left-0 mt-1 text-[10px] text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity w-full text-center pointer-events-none">
-               Requires chapter selection
+          <div>
+            <h2 className="text-2xl font-black text-red-500 flex items-center gap-2">
+               <Video className="w-6 h-6" /> Video Management
+            </h2>
+            <p className="text-sm text-slate-600 mt-1">Directly manage videos by selecting Class, Stream, Subject, Book, and Chapter.</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 mb-8 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Class / Grade</label>
+              <select 
+                value={videoClass} 
+                onChange={(e) => setVideoClass(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+              >
+                {[12,11,10,9,8,7,6,5,4,3,2,1].map(c => (
+                  <option key={c} value={c.toString()}>Class {c}</option>
+                ))}
+              </select>
+            </div>
+            
+            {(videoClass === '11' || videoClass === '12') && (
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Stream (Optional)</label>
+                <select 
+                  value={videoStream} 
+                  onChange={(e) => setVideoStream(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+                >
+                  <option value="">None / Common</option>
+                  <option value="Science">Science</option>
+                  <option value="Commerce">Commerce</option>
+                  <option value="Humanities">Humanities</option>
+                </select>
+              </div>
+            )}
+            
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Subject</label>
+              <select 
+                value={videoSubject} 
+                onChange={(e) => setVideoSubject(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+              >
+                {availableSubjectsForVideo.map(subj => (
+                  <option key={subj.id} value={subj.nameEn}>
+                    {language === 'hi' && subj.nameHi ? subj.nameHi : subj.nameEn}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {videoBooks.length > 0 && (
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Book</label>
+                <select 
+                  value={videoBook} 
+                  onChange={(e) => {
+                    setVideoBook(e.target.value);
+                    const newChaps = videoChapters.filter(c => c.book_name === e.target.value);
+                    if (newChaps.length > 0) setVideoChapter(newChaps[0].chapter_name);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+                >
+                  {videoBooks.map(book => (
+                    <option key={book} value={book}>{book}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Chapter</label>
+              <select 
+                value={videoChapter} 
+                onChange={(e) => setVideoChapter(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-red-500 cursor-pointer"
+              >
+                {chaptersForBook.length === 0 && <option value="">No chapters found</option>}
+                {chaptersForBook.map(chap => (
+                  <option key={chap.id} value={chap.chapter_name}>
+                    {chap.chapter_number}. {chap.chapter_name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="space-y-4">
-        {chapters.map(chap => (
-          <div key={chap.id} className={`border ${editingChapterId === chap.id ? 'border-red-500 ring-2 ring-red-100' : 'border-slate-200'} rounded-2xl p-5 bg-white transition-all`}>
-             <div className="flex flex-col md:flex-row gap-4 justify-between md:items-center">
-                <div>
-                  <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">Chapter {chap.chapter_number}</span>
-                  <h4 className="text-lg font-black text-slate-800 mt-2">{chap.chapter_name}</h4>
-                </div>
-                {editingChapterId === chap.id ? (
-                   <button onClick={() => setEditingChapterId(null)} className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg text-sm cursor-pointer hover:bg-slate-200">
-                      Close Video Editor
-                   </button>
-                ) : (
-                   <button onClick={() => {
-                      setEditingChapterId(chap.id);
-                      fetchChapterVideos(chap.id);
-                   }} className="px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg text-sm cursor-pointer hover:bg-red-100 flex items-center gap-2">
-                      <Play className="w-4 h-4 fill-current" /> Manage Videos
-                   </button>
-                )}
+        {videoChapter && (
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 border-t-4 border-t-red-500">
+             <div className="flex justify-between items-center mb-6">
+                <h5 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Video className="w-5 h-5 text-red-500" /> Chapter Playlist ({chapterVideos.length})
+                </h5>
              </div>
-
-             {editingChapterId === chap.id && (
-                <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex justify-between items-center mb-4">
-                      <h5 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                        <Video className="w-4 h-4 text-red-500" /> Chapter Playlist ({chapterVideos.length})
-                      </h5>
-                    </div>
-                    
-                    {chapterVideos.length > 0 && (
-                      <div className="space-y-2 mb-6">
-                        {chapterVideos.map(video => (
-                          <div key={video.id} className="flex justify-between items-center p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-                                <Play className="w-4 h-4 fill-current" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-slate-800 line-clamp-1">{video.videoTitle}</p>
-                                <p className="text-xs font-bold text-slate-500">
-                                  {video.teacherName} • {video.language.toUpperCase()} • {video.videoType}
-                                </p>
-                              </div>
-                            </div>
-                            <button onClick={() => handleDeleteVideo(video.id)} className="text-red-500 hover:text-red-700 p-2 cursor-pointer">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <div className="bg-slate-100 p-4 rounded-xl space-y-3">
-                      <h6 className="text-xs font-bold text-slate-600 uppercase">Add New Video Manually</h6>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <input type="text" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} placeholder="Video Title" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
-                        <input type="text" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} placeholder="YouTube URL" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
-                        <input type="text" value={newVideoTeacher} onChange={(e) => setNewVideoTeacher(e.target.value)} placeholder="Teacher / Channel Name" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
-                        <div className="flex gap-2">
-                          <select value={newVideoLanguage} onChange={(e) => setNewVideoLanguage(e.target.value)} className="w-1/2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none cursor-pointer">
-                            <option value="en">English</option>
-                            <option value="hi">Hindi</option>
-                          </select>
-                          <select value={newVideoType} onChange={(e) => setNewVideoType(e.target.value)} className="w-1/2 bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none cursor-pointer">
-                            <option value="explanation">Explanation</option>
-                            <option value="revision">Revision</option>
-                            <option value="practice">Practice</option>
-                          </select>
+              
+             {chapterVideos.length > 0 && (
+                <div className="space-y-3 mb-8">
+                  {chapterVideos.map(video => (
+                    <div key={video.id} className="flex justify-between items-center p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                          <Play className="w-5 h-5 fill-current" />
+                        </div>
+                        <div>
+                          <p className="text-base font-bold text-slate-800">{video.videoTitle}</p>
+                          <p className="text-xs font-bold text-slate-500 mt-1">
+                            {video.teacherName} • {video.language.toUpperCase()} • {video.videoType}
+                          </p>
                         </div>
                       </div>
-                      <button onClick={handleAddVideo} className="px-4 py-2 bg-slate-800 text-white font-bold rounded-lg text-sm w-full hover:bg-slate-900 cursor-pointer">
-                        Add Video to Chapter
+                      <button onClick={() => handleDeleteVideo(video.id)} className="text-red-500 hover:text-red-700 p-2 cursor-pointer bg-red-50 rounded-lg">
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+                  ))}
                 </div>
-             )}
-          </div>
-        ))}
-        {chapters.length === 0 && !loadingChapters && (
-          <div className="text-center py-12 bg-white rounded-3xl border border-slate-200">
-             <Video className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-             <p className="text-slate-500 font-medium">Select a class and subject to manage videos.</p>
+              )}
+              
+              <div className="bg-slate-100 p-5 rounded-2xl space-y-4">
+                <h6 className="text-sm font-bold text-slate-700 uppercase flex items-center gap-2">
+                   <Plus className="w-4 h-4 text-red-500" /> Add New Video Manually
+                </h6>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">Video Title</label>
+                     <input type="text" value={newVideoTitle} onChange={(e) => setNewVideoTitle(e.target.value)} placeholder="Title..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">YouTube URL</label>
+                     <input type="text" value={newVideoUrl} onChange={(e) => setNewVideoUrl(e.target.value)} placeholder="https://..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">Teacher / Channel</label>
+                     <input type="text" value={newVideoTeacher} onChange={(e) => setNewVideoTeacher(e.target.value)} placeholder="Name..." className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">Language</label>
+                     <select value={newVideoLanguage} onChange={(e) => setNewVideoLanguage(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none cursor-pointer">
+                       <option value="en">English</option>
+                       <option value="hi">Hindi</option>
+                     </select>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
+                     <select value={newVideoType} onChange={(e) => setNewVideoType(e.target.value)} className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none cursor-pointer">
+                       <option value="explanation">Explanation</option>
+                       <option value="revision">Revision</option>
+                       <option value="practice">Practice</option>
+                     </select>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">Duration (MM:SS)</label>
+                     <input type="text" value={newVideoDuration} onChange={(e) => setNewVideoDuration(e.target.value)} placeholder="Optional" className="w-full bg-white border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-red-500 outline-none"/>
+                  </div>
+                </div>
+                <button onClick={handleAddVideo} className="px-4 py-3 mt-2 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold rounded-xl text-sm w-full hover:shadow-lg hover:shadow-red-500/30 cursor-pointer flex items-center justify-center gap-2 transition-all">
+                  <Play className="w-4 h-4 fill-current" /> Save Video to Chapter
+                </button>
+              </div>
           </div>
         )}
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   return (
     <div className="w-full">
